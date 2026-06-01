@@ -2,16 +2,26 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
 import { allowMessagesFromGroup, initVkBridge, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
+const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
+
 const EMPTY_STATE = {
   loading: true,
   error: '',
   communityId: '',
   slug: '',
   groups: [],
-  group: null
+  group: null,
+  intro: false
 };
 
 const COPY = {
+  appTitle: 'PAPA BOT',
+  appLead: 'PAPA BOT помогает администраторам VK-сообществ собирать подписчиков в группы по интересам, запускать рассылки и автоматические сценарии.',
+  subscriberTitle: 'Для подписчика',
+  subscriberText: 'Пользователь открывает Mini App, выбирает нужную группу, разрешает сообщения от сообщества и подписывается на подходящее направление.',
+  adminTitle: 'Для администратора',
+  adminText: 'Администратор настраивает группы, заголовки, описания, изображения и тексты кнопок в панели PAPA BOT, а затем использует эти группы для сегментации и коммуникаций.',
+  demoText: 'Ниже показаны группы сообщества, доступные для подписки через Mini App.',
   subscribed: '\u0412\u044b \u0432 \u0433\u0440\u0443\u043f\u043f\u0435',
   back: '\u041d\u0430\u0437\u0430\u0434',
   saving: '\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c...',
@@ -42,6 +52,30 @@ function StatusView({ title, text }) {
         <p>{text}</p>
       </section>
     </main>
+  );
+}
+
+function ServiceIntro({ error }) {
+  return (
+    <section className="intro">
+      <div className="intro-hero">
+        <span className="intro-badge">VK Mini App</span>
+        <h1>{COPY.appTitle}</h1>
+        <p>{COPY.appLead}</p>
+      </div>
+      <div className="intro-grid">
+        <div className="intro-panel">
+          <h2>{COPY.subscriberTitle}</h2>
+          <p>{COPY.subscriberText}</p>
+        </div>
+        <div className="intro-panel">
+          <h2>{COPY.adminTitle}</h2>
+          <p>{COPY.adminText}</p>
+        </div>
+      </div>
+      <p className="intro-note">{COPY.demoText}</p>
+      {error ? <div className="inline-error">{error}</div> : null}
+    </section>
   );
 }
 
@@ -86,21 +120,27 @@ export default function App() {
 
   const loadCurrentRoute = useCallback(async () => {
     const route = parseRouteHash();
-    if (!route.communityId) {
+    const communityId = route.communityId || launchParams.vk_group_id || DEFAULT_COMMUNITY_ID;
+    const intro = !route.communityId && !launchParams.vk_group_id;
+    if (!communityId) {
       setState({ ...EMPTY_STATE, loading: false, error: COPY.openByCommunity });
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', communityId: route.communityId, slug: route.slug }));
-    try {
+    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro }));
+  try {
       if (route.slug) {
-        const data = await loadGroup(route.communityId, route.slug, launchParams);
-        setState({ loading: false, error: '', communityId: route.communityId, slug: route.slug, groups: [], group: data.group });
+        const data = await loadGroup(communityId, route.slug, launchParams);
+        setState({ loading: false, error: '', communityId, slug: route.slug, groups: [], group: data.group, intro: false });
       } else {
-        const data = await loadGroups(route.communityId, launchParams);
-        setState({ loading: false, error: '', communityId: route.communityId, slug: '', groups: data.groups || [], group: null });
+        const data = await loadGroups(communityId, launchParams);
+        setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, intro });
       }
     } catch (error) {
+      if (intro) {
+        setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: true });
+        return;
+      }
       setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed }));
     }
   }, [launchParams]);
@@ -144,6 +184,13 @@ export default function App() {
   }
 
   if (state.error && !state.group && state.groups.length === 0) {
+    if (state.intro) {
+      return (
+        <main className="app-shell">
+          <ServiceIntro error={state.error} />
+        </main>
+      );
+    }
     return <StatusView title="Mini App" text={state.error} />;
   }
 
@@ -156,13 +203,14 @@ export default function App() {
         </>
       ) : (
         <>
+          {state.intro ? <ServiceIntro error={state.error} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
           </header>
-          {state.error ? <div className="inline-error">{state.error}</div> : null}
+          {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {state.groups.length ? (
             <GroupList groups={state.groups} onOpen={openGroup} />
-          ) : (
+          ) : state.intro ? null : (
             <section className="notice"><p>{COPY.noGroups}</p></section>
           )}
         </>

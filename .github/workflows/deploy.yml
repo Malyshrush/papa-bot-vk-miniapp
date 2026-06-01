@@ -38,6 +38,7 @@ jobs:
         run: npm run build
         env:
           VITE_PAPA_BOT_API_URL: ${{ vars.PAPA_BOT_PUBLIC_URL }}
+          VITE_DEFAULT_COMMUNITY_ID: ${{ vars.DEFAULT_COMMUNITY_ID }}
           VITE_BASE_PATH: /papa-bot-vk-miniapp/
 
       - name: Configure Pages

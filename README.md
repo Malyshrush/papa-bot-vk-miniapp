@@ -24,4 +24,5 @@ Required repository variable:
 
 ```text
 PAPA_BOT_PUBLIC_URL=https://your-papa-bot-api.example
+DEFAULT_COMMUNITY_ID=229445618
 ```

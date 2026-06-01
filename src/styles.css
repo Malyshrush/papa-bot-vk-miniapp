@@ -40,11 +40,72 @@ textarea {
 
 .list-header h1,
 .notice h1,
-.detail h1 {
+.detail h1,
+.intro h1 {
   margin: 0;
   font-size: 24px;
   line-height: 1.2;
   letter-spacing: 0;
+}
+
+.intro {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.intro-hero,
+.intro-panel {
+  border: 1px solid #dce4ef;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(30, 49, 78, 0.08);
+}
+
+.intro-hero {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.intro-badge {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #e6edf7;
+  color: #2e3c52;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.intro-hero p,
+.intro-panel p,
+.intro-note {
+  margin: 0;
+  color: #5f6f85;
+  line-height: 1.5;
+}
+
+.intro-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.intro-panel {
+  padding: 16px;
+}
+
+.intro-panel h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.intro-note {
+  padding: 0 2px;
+  font-size: 14px;
 }
 
 .group-list {
@@ -187,6 +248,10 @@ textarea {
 }
 
 @media (max-width: 520px) {
+  .intro-grid {
+    grid-template-columns: 1fr;
+  }
+
   .group-card {
     grid-template-columns: 52px minmax(0, 1fr);
   }
