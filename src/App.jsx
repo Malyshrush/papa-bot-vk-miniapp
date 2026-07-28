@@ -3,6 +3,8 @@ import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.j
 import { allowMessagesFromGroup, initVkBridge, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
+const ONBOARDING_VERSION = '2026-07-28-v1';
+const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
 
 const EMPTY_STATE = {
   loading: true,
@@ -35,6 +37,103 @@ const COPY = {
   noGroups: '\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0445 \u0433\u0440\u0443\u043f\u043f \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.'
 };
 
+const ONBOARDING_STEPS = [
+  {
+    icon: '🎯',
+    eyebrow: 'Шаг 1 из 3',
+    title: 'Выбирайте только интересное',
+    text: 'PAPA BOT показывает направления конкретного сообщества. Вы выбираете темы, новости или предложения, которые хотите получать.',
+    points: ['Никаких случайных подписок', 'Понятное описание каждого направления']
+  },
+  {
+    icon: '💬',
+    eyebrow: 'Шаг 2 из 3',
+    title: 'Подписка в два действия',
+    text: 'Откройте карточку направления, нажмите «Подписаться» и разрешите сообщения от сообщества. Выбор сохранится в PAPA BOT.',
+    points: ['Разрешение запрашивается только при подписке', 'Сообщения отправляет выбранное VK-сообщество']
+  },
+  {
+    icon: '✓',
+    eyebrow: 'Шаг 3 из 3',
+    title: 'Вы управляете подписками',
+    text: 'Подключённые направления отмечены в списке. В любой момент откройте карточку и нажмите «Отписаться».',
+    points: ['Статус виден прямо в приложении', 'Вернуться к обучению можно по кнопке «Как это работает»']
+  }
+];
+
+function hasCompletedOnboarding() {
+  try {
+    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === ONBOARDING_VERSION;
+  } catch (error) {
+    return false;
+  }
+}
+
+function rememberCompletedOnboarding() {
+  try {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, ONBOARDING_VERSION);
+  } catch (error) {
+    // VK WebView can restrict storage; onboarding still closes for the current session.
+  }
+}
+
+function Onboarding({ onComplete }) {
+  const [stepIndex, setStepIndex] = useState(0);
+  const step = ONBOARDING_STEPS[stepIndex];
+  const isLast = stepIndex === ONBOARDING_STEPS.length - 1;
+
+  return (
+    <main className="onboarding-shell">
+      <section className="onboarding-card" aria-labelledby="onboarding-title">
+        <div className="onboarding-brand">
+          <span className="brand-mark">PB</span>
+          <span>PAPA BOT</span>
+        </div>
+        <div className="onboarding-progress" aria-label={`Шаг ${stepIndex + 1} из ${ONBOARDING_STEPS.length}`}>
+          {ONBOARDING_STEPS.map((item, index) => (
+            <span className={index <= stepIndex ? 'is-active' : ''} key={item.title} />
+          ))}
+        </div>
+        <div className="onboarding-visual" aria-hidden="true">{step.icon}</div>
+        <p className="onboarding-eyebrow">{step.eyebrow}</p>
+        <h1 id="onboarding-title">{step.title}</h1>
+        <p className="onboarding-text">{step.text}</p>
+        <ul className="onboarding-points">
+          {step.points.map((point) => <li key={point}>{point}</li>)}
+        </ul>
+        <div className="onboarding-actions">
+          {stepIndex > 0 ? (
+            <button className="secondary-button" type="button" onClick={() => setStepIndex((index) => index - 1)}>
+              Назад
+            </button>
+          ) : (
+            <button className="secondary-button" type="button" onClick={onComplete}>
+              Перейти к группам
+            </button>
+          )}
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => {
+              if (isLast) {
+                onComplete();
+              } else {
+                setStepIndex((index) => index + 1);
+              }
+            }}
+          >
+            {isLast ? 'Начать' : 'Далее'}
+          </button>
+        </div>
+        <p className="onboarding-legal">
+          Продолжая, вы принимаете <a href="./legal/terms.html" target="_blank" rel="noreferrer">условия использования</a>
+          {' '}и <a href="./legal/privacy.html" target="_blank" rel="noreferrer">политику конфиденциальности</a>.
+        </p>
+      </section>
+    </main>
+  );
+}
+
 function PlaceholderImage({ type }) {
   return <div className={`placeholder placeholder-${type}`}>{type === 'banner' ? 'PAPA BOT' : 'PB'}</div>;
 }
@@ -55,27 +154,41 @@ function StatusView({ title, text }) {
   );
 }
 
-function ServiceIntro({ error }) {
+function ServiceIntro({ onShowOnboarding }) {
   return (
-    <section className="intro">
+    <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
-        <span className="intro-badge">VK Mini App</span>
-        <h1>{COPY.appTitle}</h1>
+        <div className="intro-heading">
+          <span className="intro-badge">VK Mini App</span>
+          <button className="help-button" type="button" onClick={onShowOnboarding}>Как это работает</button>
+        </div>
+        <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
       </div>
-      <div className="intro-grid">
-        <div className="intro-panel">
-          <h2>{COPY.subscriberTitle}</h2>
-          <p>{COPY.subscriberText}</p>
-        </div>
-        <div className="intro-panel">
-          <h2>{COPY.adminTitle}</h2>
-          <p>{COPY.adminText}</p>
-        </div>
-      </div>
-      <p className="intro-note">{COPY.demoText}</p>
-      {error ? <div className="inline-error">{error}</div> : null}
     </section>
+  );
+}
+
+function EmptyGroups({ onShowOnboarding }) {
+  return (
+    <section className="empty-groups">
+      <div className="empty-groups-icon" aria-hidden="true">☰</div>
+      <h2>Направления пока не опубликованы</h2>
+      <p>Администратор сообщества ещё не добавил доступные подписки. Когда они появятся, здесь будут карточки с описанием и кнопкой подключения.</p>
+      <button className="secondary-button" type="button" onClick={onShowOnboarding}>Посмотреть, как это работает</button>
+    </section>
+  );
+}
+
+function LegalFooter() {
+  return (
+    <footer className="legal-footer">
+      <a href="./legal/terms.html" target="_blank" rel="noreferrer">Соглашение</a>
+      <span>·</span>
+      <a href="./legal/privacy.html" target="_blank" rel="noreferrer">Конфиденциальность</a>
+      <span>·</span>
+      <a href="./legal/consent.html" target="_blank" rel="noreferrer">Согласие на ОПД</a>
+    </footer>
   );
 }
 
@@ -117,6 +230,7 @@ export default function App() {
   const launchParams = useMemo(() => parseLaunchParams(), []);
   const [state, setState] = useState(EMPTY_STATE);
   const [busy, setBusy] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
 
   const loadCurrentRoute = useCallback(async () => {
     const route = parseRouteHash();
@@ -128,7 +242,7 @@ export default function App() {
     }
 
     setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro }));
-  try {
+    try {
       if (route.slug) {
         const data = await loadGroup(communityId, route.slug, launchParams);
         setState({ loading: false, error: '', communityId, slug: route.slug, groups: [], group: data.group, intro: false });
@@ -137,11 +251,7 @@ export default function App() {
         setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, intro });
       }
     } catch (error) {
-      if (intro) {
-        setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: true });
-        return;
-      }
-      setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed }));
+      setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed, intro }));
     }
   }, [launchParams]);
 
@@ -154,6 +264,10 @@ export default function App() {
 
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);
+  const completeOnboarding = () => {
+    rememberCompletedOnboarding();
+    setShowOnboarding(false);
+  };
 
   const toggleSubscription = async () => {
     if (!state.group || !state.communityId) return;
@@ -179,6 +293,10 @@ export default function App() {
     }
   };
 
+  if (showOnboarding) {
+    return <Onboarding onComplete={completeOnboarding} />;
+  }
+
   if (state.loading) {
     return <StatusView title={COPY.loading} text={COPY.loadingGroups} />;
   }
@@ -187,7 +305,9 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-          <ServiceIntro error={state.error} />
+          <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} />
+          <div className="inline-error">{state.error}</div>
+          <LegalFooter />
         </main>
       );
     }
@@ -198,23 +318,28 @@ export default function App() {
     <main className="app-shell">
       {state.group ? (
         <>
+          <div className="detail-toolbar">
+            <button className="help-button" type="button" onClick={() => setShowOnboarding(true)}>Как это работает</button>
+          </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
           <GroupDetail group={state.group} busy={busy} onBack={backToList} onToggle={toggleSubscription} />
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro error={state.error} /> : null}
+          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
+            {!state.intro ? <button className="help-button" type="button" onClick={() => setShowOnboarding(true)}>Как это работает</button> : null}
           </header>
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {state.groups.length ? (
             <GroupList groups={state.groups} onOpen={openGroup} />
-          ) : state.intro ? null : (
-            <section className="notice"><p>{COPY.noGroups}</p></section>
+          ) : (
+            <EmptyGroups onShowOnboarding={() => setShowOnboarding(true)} />
           )}
         </>
       )}
+      <LegalFooter />
     </main>
   );
 }
