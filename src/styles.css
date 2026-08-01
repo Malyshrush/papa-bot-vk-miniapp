@@ -472,6 +472,10 @@ button {
   gap: 8px;
 }
 
+.detail-copy h1 {
+  text-align: center;
+}
+
 .detail-copy p,
 .notice p {
   margin: 0;
