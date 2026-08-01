@@ -483,6 +483,11 @@ button {
   line-height: 1.5;
 }
 
+.detail-copy p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .primary-button,
 .back-button,
 .secondary-button,
