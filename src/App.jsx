@@ -3,8 +3,10 @@ import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.j
 import { allowMessagesFromGroup, initVkBridge, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
+const DEFAULT_ACTION_COLOR = '#2f6fed';
 const ONBOARDING_VERSION = '2026-07-28-v1';
 const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
+const THEME_STORAGE_PREFIX = 'papa-bot-miniapp-theme';
 
 const EMPTY_STATE = {
   loading: true,
@@ -34,7 +36,7 @@ const COPY = {
   openInVkForSubscribe: '\u0414\u043b\u044f \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u0439 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438 \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 Mini App \u0432\u043d\u0443\u0442\u0440\u0438 VK: \u0442\u0430\u043a VK \u043f\u0435\u0440\u0435\u0434\u0430\u0451\u0442 \u043f\u043e\u0434\u043f\u0438\u0441\u0430\u043d\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f.',
   loading: '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430',
   loadingGroups: '\u041f\u043e\u043b\u0443\u0447\u0430\u0435\u043c \u0433\u0440\u0443\u043f\u043f\u044b \u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0430',
-  groupsTitle: '\u0413\u0440\u0443\u043f\u043f\u044b \u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0430',
+  groupsTitle: 'Подписные сообщества',
   noGroups: '\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0445 \u0433\u0440\u0443\u043f\u043f \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.'
 };
 
@@ -75,6 +77,28 @@ function rememberCompletedOnboarding() {
     window.localStorage.setItem(ONBOARDING_STORAGE_KEY, ONBOARDING_VERSION);
   } catch (error) {
     // VK WebView can restrict storage; onboarding still closes for the current session.
+  }
+}
+
+function getThemeStorageKey(userId) {
+  return `${THEME_STORAGE_PREFIX}:${String(userId || 'browser')}`;
+}
+
+function getInitialTheme(storageKey) {
+  try {
+    const savedTheme = window.localStorage.getItem(storageKey);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch (error) {
+    return 'light';
+  }
+}
+
+function rememberTheme(storageKey, theme) {
+  try {
+    window.localStorage.setItem(storageKey, theme);
+  } catch (error) {
+    // VK WebView can restrict storage; the selected theme still works for this session.
   }
 }
 
@@ -155,13 +179,40 @@ function StatusView({ title, text }) {
   );
 }
 
-function ServiceIntro({ onShowOnboarding }) {
+function ThemeToggle({ theme, onToggle }) {
+  const isDark = theme === 'dark';
+  return (
+    <button
+      className={`theme-toggle ${isDark ? 'is-dark' : 'is-light'}`}
+      type="button"
+      role="switch"
+      aria-checked={isDark}
+      aria-label={isDark ? 'Включена тёмная тема. Переключить на светлую' : 'Включена светлая тема. Переключить на тёмную'}
+      onClick={onToggle}
+    >
+      <span className="theme-toggle-icon" aria-hidden="true">☀</span>
+      <span className="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span className="theme-toggle-thumb" aria-hidden="true" />
+    </button>
+  );
+}
+
+function HeaderActions({ onShowOnboarding, theme, onToggleTheme }) {
+  return (
+    <div className="view-actions">
+      <button className="help-button" type="button" onClick={onShowOnboarding}>Как это работает</button>
+      <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+    </div>
+  );
+}
+
+function ServiceIntro({ onShowOnboarding, theme, onToggleTheme }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
         <div className="intro-heading">
           <span className="intro-badge">VK Mini App</span>
-          <button className="help-button" type="button" onClick={onShowOnboarding}>Как это работает</button>
+          <HeaderActions onShowOnboarding={onShowOnboarding} theme={theme} onToggleTheme={onToggleTheme} />
         </div>
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
@@ -193,6 +244,20 @@ function LegalFooter() {
   );
 }
 
+function normalizeButtonColor(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || '').trim())
+    ? String(value).trim().toLowerCase()
+    : DEFAULT_ACTION_COLOR;
+}
+
+function getReadableButtonTextColor(backgroundColor) {
+  const hex = normalizeButtonColor(backgroundColor).slice(1);
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  return ((red * 299 + green * 587 + blue * 114) / 1000) >= 165 ? '#10203a' : '#ffffff';
+}
+
 function GroupList({ groups, onOpen }) {
   return (
     <div className="group-list">
@@ -212,6 +277,8 @@ function GroupList({ groups, onOpen }) {
 
 function GroupDetail({ group, busy, onBack, onToggle }) {
   const buttonText = group.subscribed ? group.unsubscribeText : group.subscribeText;
+  const buttonColor = normalizeButtonColor(group.subscribed ? group.unsubscribeColor : group.subscribeColor);
+  const buttonStyle = { backgroundColor: buttonColor, color: getReadableButtonTextColor(buttonColor) };
   return (
     <article className="detail">
       <button className="back-button" type="button" onClick={onBack}>{COPY.back}</button>
@@ -220,7 +287,7 @@ function GroupDetail({ group, busy, onBack, onToggle }) {
         <h1>{group.title}</h1>
         {group.description ? <p>{group.description}</p> : null}
       </div>
-      <button className="primary-button" type="button" disabled={busy} onClick={onToggle}>
+      <button className="primary-button subscription-button" type="button" style={buttonStyle} disabled={busy} onClick={onToggle}>
         {busy ? COPY.saving : buttonText}
       </button>
     </article>
@@ -229,6 +296,8 @@ function GroupDetail({ group, busy, onBack, onToggle }) {
 
 export default function App() {
   const launchParams = useMemo(() => parseLaunchParams(), []);
+  const themeStorageKey = useMemo(() => getThemeStorageKey(launchParams.vk_user_id), [launchParams.vk_user_id]);
+  const [theme, setTheme] = useState(() => getInitialTheme(themeStorageKey));
   const [state, setState] = useState(EMPTY_STATE);
   const [busy, setBusy] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
@@ -263,12 +332,19 @@ export default function App() {
     return () => window.removeEventListener('hashchange', loadCurrentRoute);
   }, [loadCurrentRoute]);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    rememberTheme(themeStorageKey, theme);
+  }, [theme, themeStorageKey]);
+
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);
   const completeOnboarding = () => {
     rememberCompletedOnboarding();
     setShowOnboarding(false);
   };
+  const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
 
   const toggleSubscription = async () => {
     if (!state.group || !state.communityId) return;
@@ -309,7 +385,7 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-          <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} />
+          <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
           <div className="inline-error">{state.error}</div>
           <LegalFooter />
         </main>
@@ -323,17 +399,17 @@ export default function App() {
       {state.group ? (
         <>
           <div className="detail-toolbar">
-            <button className="help-button" type="button" onClick={() => setShowOnboarding(true)}>Как это работает</button>
+            <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
           </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
           <GroupDetail group={state.group} busy={busy} onBack={backToList} onToggle={toggleSubscription} />
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} /> : null}
+          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
-            {!state.intro ? <button className="help-button" type="button" onClick={() => setShowOnboarding(true)}>Как это работает</button> : null}
+            {!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
           </header>
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {state.groups.length ? (

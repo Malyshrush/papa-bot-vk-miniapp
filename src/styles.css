@@ -1,8 +1,56 @@
 :root {
   color-scheme: light;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #f3f6fb;
-  color: #152033;
+  --app-bg: #f3f6fb;
+  --surface: #ffffff;
+  --surface-soft: #e6edf7;
+  --text-primary: #152033;
+  --text-secondary: #2e3c52;
+  --text-muted: #5f6f85;
+  --text-subtle: #7a899d;
+  --border: #dce4ef;
+  --shadow: 0 10px 24px rgba(30, 49, 78, 0.08);
+  --shadow-large: 0 24px 70px rgba(30, 49, 78, 0.14);
+  --accent: #2688eb;
+  --accent-soft: #e8f3ff;
+  --accent-border: #d7eaff;
+  --link: #447bba;
+  --placeholder-bg: #dfe7f2;
+  --placeholder-text: #4f6380;
+  --success-bg: #eaf8ef;
+  --success-border: #b8e3ca;
+  --success-text: #20713e;
+  --error-bg: #fff3f3;
+  --error-border: #f1c9c9;
+  --error-text: #a22c2c;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #0b1220;
+  --surface: #121d2f;
+  --surface-soft: #1d2a40;
+  --text-primary: #f2f6fc;
+  --text-secondary: #d7e0ee;
+  --text-muted: #aebbd0;
+  --text-subtle: #8797af;
+  --border: #2c3c55;
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  --shadow-large: 0 24px 70px rgba(0, 0, 0, 0.38);
+  --accent: #63adff;
+  --accent-soft: #172c47;
+  --accent-border: #31577f;
+  --link: #82bcff;
+  --placeholder-bg: #1b2a40;
+  --placeholder-text: #afc0d7;
+  --success-bg: #173525;
+  --success-border: #2b6442;
+  --success-text: #94e6af;
+  --error-bg: #3a1c25;
+  --error-border: #713447;
+  --error-text: #ff9fb0;
 }
 
 * {
@@ -13,7 +61,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f3f6fb;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 button,
@@ -34,7 +84,7 @@ button {
   background:
     radial-gradient(circle at 15% 8%, rgba(38, 136, 235, 0.16), transparent 34%),
     radial-gradient(circle at 90% 92%, rgba(82, 179, 115, 0.13), transparent 36%),
-    #f3f6fb;
+    var(--app-bg);
 }
 
 .onboarding-card {
@@ -43,17 +93,17 @@ button {
   display: flex;
   flex-direction: column;
   padding: 28px;
-  border: 1px solid #dce4ef;
+  border: 1px solid var(--border);
   border-radius: 20px;
-  background: #ffffff;
-  box-shadow: 0 24px 70px rgba(30, 49, 78, 0.14);
+  background: var(--surface);
+  box-shadow: var(--shadow-large);
 }
 
 .onboarding-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #152033;
+  color: var(--text-primary);
   font-weight: 850;
 }
 
@@ -63,7 +113,7 @@ button {
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: #2688eb;
+  background: var(--accent);
   color: #ffffff;
   font-size: 13px;
   box-shadow: 0 8px 20px rgba(38, 136, 235, 0.25);
@@ -79,11 +129,11 @@ button {
 .onboarding-progress span {
   height: 5px;
   border-radius: 999px;
-  background: #dce4ef;
+  background: var(--border);
 }
 
 .onboarding-progress span.is-active {
-  background: #2688eb;
+  background: var(--accent);
 }
 
 .onboarding-visual {
@@ -93,15 +143,15 @@ button {
   place-items: center;
   margin: 34px auto 24px;
   border-radius: 32px;
-  background: linear-gradient(145deg, #e8f3ff, #f4f9ff);
-  color: #2688eb;
+  background: linear-gradient(145deg, var(--accent-soft), var(--surface-soft));
+  color: var(--accent);
   font-size: 48px;
-  box-shadow: inset 0 0 0 1px #d7eaff, 0 18px 35px rgba(38, 136, 235, 0.12);
+  box-shadow: inset 0 0 0 1px var(--accent-border), 0 18px 35px rgba(38, 136, 235, 0.12);
 }
 
 .onboarding-eyebrow {
   margin: 0 0 7px;
-  color: #2688eb;
+  color: var(--accent);
   font-size: 13px;
   font-weight: 800;
   text-align: center;
@@ -111,7 +161,7 @@ button {
 
 .onboarding-card h1 {
   margin: 0;
-  color: #152033;
+  color: var(--text-primary);
   font-size: 28px;
   line-height: 1.15;
   text-align: center;
@@ -120,7 +170,7 @@ button {
 .onboarding-text {
   margin: 13px auto 0;
   max-width: 470px;
-  color: #5f6f85;
+  color: var(--text-muted);
   line-height: 1.55;
   text-align: center;
 }
@@ -136,7 +186,7 @@ button {
 .onboarding-points li {
   position: relative;
   padding-left: 28px;
-  color: #33445d;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -150,8 +200,8 @@ button {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #eaf8ef;
-  color: #20713e;
+  background: var(--success-bg);
+  color: var(--success-text);
   font-size: 12px;
   font-weight: 900;
 }
@@ -171,7 +221,7 @@ button {
 
 .onboarding-legal {
   margin: 14px 0 0;
-  color: #7a899d;
+  color: var(--text-subtle);
   font-size: 11px;
   line-height: 1.45;
   text-align: center;
@@ -179,7 +229,7 @@ button {
 
 .onboarding-legal a,
 .legal-footer a {
-  color: #447bba;
+  color: var(--link);
 }
 
 .app-shell {
@@ -199,7 +249,62 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   padding: 4px 2px 14px;
+}
+
+.view-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.theme-toggle {
+  position: relative;
+  width: 70px;
+  min-width: 70px;
+  height: 36px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.theme-toggle-icon {
+  position: relative;
+  z-index: 2;
+  font-size: 15px;
+  line-height: 1;
+  transition: color 160ms ease;
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 3px 10px rgba(20, 32, 51, 0.22);
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.theme-toggle.is-light .theme-toggle-icon:first-child,
+.theme-toggle.is-dark .theme-toggle-icon:nth-child(2) {
+  color: var(--accent);
+}
+
+.theme-toggle.is-dark .theme-toggle-thumb {
+  transform: translateX(34px);
 }
 
 .list-header h1,
@@ -220,10 +325,10 @@ button {
 
 .intro-hero,
 .intro-panel {
-  border: 1px solid #dce4ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(30, 49, 78, 0.08);
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .intro-hero {
@@ -243,8 +348,8 @@ button {
   justify-self: start;
   border-radius: 999px;
   padding: 5px 9px;
-  background: #e6edf7;
-  color: #2e3c52;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 800;
 }
@@ -253,7 +358,7 @@ button {
 .intro-panel p,
 .intro-note {
   margin: 0;
-  color: #5f6f85;
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -287,9 +392,9 @@ button {
 .group-card {
   width: 100%;
   min-height: 86px;
-  border: 1px solid #dce4ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   color: inherit;
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr) auto;
@@ -297,7 +402,7 @@ button {
   align-items: center;
   padding: 12px;
   text-align: left;
-  box-shadow: 0 10px 24px rgba(30, 49, 78, 0.08);
+  box-shadow: var(--shadow);
 }
 
 .group-card-copy {
@@ -312,7 +417,7 @@ button {
 }
 
 .group-card-copy span {
-  color: #5f6f85;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.35;
   overflow: hidden;
@@ -336,23 +441,23 @@ button {
   aspect-ratio: 16 / 7;
   border-radius: 8px;
   object-fit: cover;
-  background: #dfe7f2;
+  background: var(--placeholder-bg);
 }
 
 .placeholder {
   display: grid;
   place-items: center;
-  background: #dfe7f2;
-  color: #4f6380;
+  background: var(--placeholder-bg);
+  color: var(--placeholder-text);
   font-weight: 800;
 }
 
 .subscribed-mark {
-  border: 1px solid #b8e3ca;
+  border: 1px solid var(--success-border);
   border-radius: 999px;
   padding: 6px 10px;
-  background: #eaf8ef;
-  color: #20713e;
+  background: var(--success-bg);
+  color: var(--success-text);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -370,7 +475,7 @@ button {
 .detail-copy p,
 .notice p {
   margin: 0;
-  color: #5f6f85;
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -391,6 +496,10 @@ button {
   font-weight: 800;
 }
 
+.subscription-button {
+  transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
 .primary-button:disabled {
   opacity: 0.7;
   cursor: wait;
@@ -398,8 +507,8 @@ button {
 
 .secondary-button,
 .help-button {
-  background: #e6edf7;
-  color: #2e3c52;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
@@ -418,24 +527,24 @@ button {
   justify-self: start;
   min-height: 38px;
   padding: 0 12px;
-  background: #e6edf7;
-  color: #2e3c52;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
 .notice,
 .inline-error {
-  border: 1px solid #dce4ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   padding: 18px;
-  box-shadow: 0 10px 24px rgba(30, 49, 78, 0.08);
+  box-shadow: var(--shadow);
 }
 
 .inline-error {
-  color: #a22c2c;
-  background: #fff3f3;
-  border-color: #f1c9c9;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-color: var(--error-border);
 }
 
 .detail-toolbar {
@@ -448,10 +557,10 @@ button {
   display: grid;
   justify-items: center;
   padding: 34px 22px;
-  border: 1px solid #dce4ef;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(30, 49, 78, 0.08);
+  background: var(--surface);
+  box-shadow: var(--shadow);
   text-align: center;
 }
 
@@ -461,8 +570,8 @@ button {
   display: grid;
   place-items: center;
   border-radius: 22px;
-  background: #e8f3ff;
-  color: #2688eb;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 30px;
 }
 
@@ -474,7 +583,7 @@ button {
 .empty-groups p {
   max-width: 520px;
   margin: 0 0 18px;
-  color: #5f6f85;
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -484,7 +593,7 @@ button {
   gap: 7px;
   flex-wrap: wrap;
   padding: 24px 10px 4px;
-  color: #8a98aa;
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -523,6 +632,15 @@ button {
 
   .intro-grid {
     grid-template-columns: 1fr;
+  }
+
+  .intro-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-actions {
+    justify-content: flex-end;
   }
 
   .group-card {
