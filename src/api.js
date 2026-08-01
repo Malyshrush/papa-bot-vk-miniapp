@@ -1,7 +1,15 @@
 const API_BASE = import.meta.env.VITE_PAPA_BOT_API_URL || '';
+const PAPA_BOT_PRODUCTION_API_URL = 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
+const REQUEST_TIMEOUT_MS = 12000;
+
+function resolveApiBase() {
+  if (API_BASE) return API_BASE;
+  if (window.location.hostname === 'malyshrush.github.io') return PAPA_BOT_PRODUCTION_API_URL;
+  return window.location.origin;
+}
 
 function buildUrl(params = {}) {
-  const url = new URL(API_BASE || window.location.origin);
+  const url = new URL(resolveApiBase());
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, value);
@@ -18,6 +26,22 @@ async function readJson(response) {
   return data;
 }
 
+async function requestJson(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return await readJson(response);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0431\u044b\u0441\u0442\u0440\u043e \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043e\u0442\u0432\u0435\u0442 Mini App. \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function appendLaunchParams(params, launchParams) {
   const next = { ...params };
   Object.entries(launchParams || {}).forEach(([key, value]) => {
@@ -27,25 +51,25 @@ function appendLaunchParams(params, launchParams) {
 }
 
 export function loadGroups(communityId, launchParams) {
-  return fetch(buildUrl(appendLaunchParams({ miniapp: 'groups', c: communityId }, launchParams))).then(readJson);
+  return requestJson(buildUrl(appendLaunchParams({ miniapp: 'groups', c: communityId }, launchParams)));
 }
 
 export function loadGroup(communityId, slug, launchParams) {
-  return fetch(buildUrl(appendLaunchParams({ miniapp: 'group', c: communityId, g: slug }, launchParams))).then(readJson);
+  return requestJson(buildUrl(appendLaunchParams({ miniapp: 'group', c: communityId, g: slug }, launchParams)));
 }
 
 export function subscribeGroup(communityId, slug, launchParams) {
-  return fetch(buildUrl({ miniapp: 'subscribe', c: communityId, g: slug }), {
+  return requestJson(buildUrl({ miniapp: 'subscribe', c: communityId, g: slug }), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ launchParams })
-  }).then(readJson);
+  });
 }
 
 export function unsubscribeGroup(communityId, slug, launchParams) {
-  return fetch(buildUrl({ miniapp: 'unsubscribe', c: communityId, g: slug }), {
+  return requestJson(buildUrl({ miniapp: 'unsubscribe', c: communityId, g: slug }), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ launchParams })
-  }).then(readJson);
+  });
 }
