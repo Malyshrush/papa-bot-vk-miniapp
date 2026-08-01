@@ -7,6 +7,7 @@ const DEFAULT_ACTION_COLOR = '#2f6fed';
 const ONBOARDING_VERSION = '2026-07-28-v1';
 const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
 const THEME_STORAGE_PREFIX = 'papa-bot-miniapp-theme';
+const NOTICE_DURATION_MS = 5000;
 
 const EMPTY_STATE = {
   loading: true,
@@ -337,6 +338,17 @@ export default function App() {
     document.documentElement.style.colorScheme = theme;
     rememberTheme(themeStorageKey, theme);
   }, [theme, themeStorageKey]);
+
+  useEffect(() => {
+    if (!state.error) return undefined;
+    const currentNotice = state.error;
+    const noticeTimeoutId = window.setTimeout(() => {
+      setState((currentState) => currentState.error === currentNotice
+        ? { ...currentState, error: '' }
+        : currentState);
+    }, NOTICE_DURATION_MS);
+    return () => window.clearTimeout(noticeTimeoutId);
+  }, [state.error]);
 
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);

@@ -57,6 +57,6 @@ export async function allowMessagesFromGroup(communityId) {
   return sendBridgeWithTimeout(
     'VKWebAppAllowMessagesFromGroup',
     { group_id: groupId },
-    '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043e\u0442\u0432\u0435\u0442 VK. \u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 Mini App \u0432\u043d\u0443\u0442\u0440\u0438 VK \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435.'
+    'VK не отвечает. Откройте Приложение авторизовавшись в VK или повторите попытку.'
   );
 }
