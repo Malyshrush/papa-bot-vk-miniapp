@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
 import { allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
@@ -259,6 +260,14 @@ function getReadableButtonTextColor(backgroundColor) {
   return ((red * 299 + green * 587 + blue * 114) / 1000) >= 165 ? '#10203a' : '#ffffff';
 }
 
+function waitForNextPaint() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(resolve);
+    });
+  });
+}
+
 function GroupList({ groups, onOpen }) {
   return (
     <div className="group-list">
@@ -379,12 +388,20 @@ export default function App() {
         await allowMessagesFromGroup(state.communityId);
         const data = await subscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: true };
-        setState((prev) => ({ ...prev, group: updatedGroup }));
+        flushSync(() => {
+          setState((prev) => ({ ...prev, group: updatedGroup }));
+          setBusy(false);
+        });
+        await waitForNextPaint();
         openMiniAppRedirect(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId);
       } else {
         const data = await unsubscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: false };
-        setState((prev) => ({ ...prev, group: updatedGroup }));
+        flushSync(() => {
+          setState((prev) => ({ ...prev, group: updatedGroup }));
+          setBusy(false);
+        });
+        await waitForNextPaint();
         openMiniAppRedirect(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId);
       }
     } catch (error) {
