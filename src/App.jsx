@@ -385,7 +385,6 @@ export default function App() {
         throw new Error(COPY.openInVkForSubscribe);
       }
       if (!state.group.subscribed) {
-        await allowMessagesFromGroup(state.communityId);
         const data = await subscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: true };
         flushSync(() => {
@@ -393,6 +392,11 @@ export default function App() {
           setBusy(false);
         });
         await waitForNextPaint();
+        try {
+          await allowMessagesFromGroup(state.communityId);
+        } catch {
+          // Subscription is already saved. VK message permission is optional and must not roll it back.
+        }
         openMiniAppRedirect(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId);
       } else {
         const data = await unsubscribeGroup(state.communityId, state.group.slug, launchParams);
