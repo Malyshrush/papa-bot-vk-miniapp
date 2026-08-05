@@ -30,7 +30,7 @@ async function requestJson(url, options = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, cache: 'no-store', signal: controller.signal });
     return await readJson(response);
   } catch (error) {
     if (controller.signal.aborted) {

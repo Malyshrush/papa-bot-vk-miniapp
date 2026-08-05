@@ -334,6 +334,16 @@ export default function App() {
   }, [loadCurrentRoute]);
 
   useEffect(() => {
+    const refreshAfterExternalNavigation = () => {
+      if (document.visibilityState === 'visible') {
+        loadCurrentRoute();
+      }
+    };
+    document.addEventListener('visibilitychange', refreshAfterExternalNavigation);
+    return () => document.removeEventListener('visibilitychange', refreshAfterExternalNavigation);
+  }, [loadCurrentRoute]);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     rememberTheme(themeStorageKey, theme);

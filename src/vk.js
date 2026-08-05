@@ -69,7 +69,7 @@ export function openMiniAppRedirect(mode, customUrl, communityId) {
   if (!redirectUrl) {
     return false;
   }
-  window.location.assign(redirectUrl);
+  window.open(redirectUrl, '_blank', 'noopener,noreferrer');
   return true;
 }
 
