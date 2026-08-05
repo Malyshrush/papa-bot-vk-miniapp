@@ -36,6 +36,43 @@ export function setGroupHash(communityId, slug = '') {
   window.location.hash = params.toString();
 }
 
+function normalizeCommunityId(value) {
+  const normalized = String(value || '').trim().replace(/^-/, '');
+  return /^\d+$/.test(normalized) ? normalized : '';
+}
+
+export function buildMiniAppRedirectUrl(mode, customUrl, communityId) {
+  const normalizedCommunityId = normalizeCommunityId(communityId);
+  if (mode === 'messages') {
+    return normalizedCommunityId ? `https://vk.com/im?sel=-${normalizedCommunityId}` : '';
+  }
+  if (mode === 'community') {
+    return normalizedCommunityId ? `https://vk.com/club${normalizedCommunityId}` : '';
+  }
+  if (mode !== 'url') {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(String(customUrl || '').trim());
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return '';
+    }
+    return parsed.toString();
+  } catch (error) {
+    return '';
+  }
+}
+
+export function openMiniAppRedirect(mode, customUrl, communityId) {
+  const redirectUrl = buildMiniAppRedirectUrl(mode, customUrl, communityId);
+  if (!redirectUrl) {
+    return false;
+  }
+  window.location.assign(redirectUrl);
+  return true;
+}
+
 export async function initVkBridge() {
   try {
     await sendBridgeWithTimeout(

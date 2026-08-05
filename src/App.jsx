@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { allowMessagesFromGroup, initVkBridge, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
+import { allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
 const DEFAULT_ACTION_COLOR = '#2f6fed';
@@ -368,10 +368,14 @@ export default function App() {
       if (!state.group.subscribed) {
         await allowMessagesFromGroup(state.communityId);
         const data = await subscribeGroup(state.communityId, state.group.slug, launchParams);
-        setState((prev) => ({ ...prev, group: data.group || { ...prev.group, subscribed: true } }));
+        const updatedGroup = data.group || { ...state.group, subscribed: true };
+        setState((prev) => ({ ...prev, group: updatedGroup }));
+        openMiniAppRedirect(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId);
       } else {
         const data = await unsubscribeGroup(state.communityId, state.group.slug, launchParams);
-        setState((prev) => ({ ...prev, group: data.group || { ...prev.group, subscribed: false } }));
+        const updatedGroup = data.group || { ...state.group, subscribed: false };
+        setState((prev) => ({ ...prev, group: updatedGroup }));
+        openMiniAppRedirect(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId);
       }
     } catch (error) {
       setState((prev) => ({
