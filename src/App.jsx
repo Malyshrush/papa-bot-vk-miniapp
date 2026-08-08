@@ -104,6 +104,26 @@ function rememberTheme(storageKey, theme) {
   }
 }
 
+function subscriptionStorageKey(userId, communityId, slug) {
+  return `papa-bot-miniapp-subscription:${String(userId || 'browser')}:${String(communityId || '')}:${String(slug || '')}`;
+}
+
+function rememberSubscription(userId, communityId, slug, subscribed) {
+  try {
+    const key = subscriptionStorageKey(userId, communityId, slug);
+    if (subscribed) window.localStorage.setItem(key, '1');
+    else window.localStorage.removeItem(key);
+  } catch (error) {}
+}
+
+function readRememberedSubscription(userId, communityId, slug) {
+  try {
+    return window.localStorage.getItem(subscriptionStorageKey(userId, communityId, slug)) === '1';
+  } catch (error) {
+    return false;
+  }
+}
+
 function Onboarding({ onComplete }) {
   const [stepIndex, setStepIndex] = useState(0);
   const step = ONBOARDING_STEPS[stepIndex];
@@ -325,7 +345,9 @@ export default function App() {
     try {
       if (route.slug) {
         const data = await loadGroup(communityId, route.slug, launchParams);
-        setState({ loading: false, error: '', communityId, slug: route.slug, groups: [], group: data.group, intro: false });
+        const rememberedSubscribed = readRememberedSubscription(launchParams.vk_user_id, communityId, route.slug);
+        const group = data.group && rememberedSubscribed ? { ...data.group, subscribed: true } : data.group;
+        setState({ loading: false, error: '', communityId, slug: route.slug, groups: [], group, intro: false });
       } else {
         const data = await loadGroups(communityId, launchParams);
         setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, intro });
@@ -391,6 +413,7 @@ export default function App() {
           setState((prev) => ({ ...prev, group: updatedGroup }));
           setBusy(false);
         });
+        rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, true);
         await waitForNextPaint();
         try {
           await allowMessagesFromGroup(state.communityId);
@@ -405,6 +428,7 @@ export default function App() {
           setState((prev) => ({ ...prev, group: updatedGroup }));
           setBusy(false);
         });
+        rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, false);
         await waitForNextPaint();
         openMiniAppRedirect(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId);
       }
