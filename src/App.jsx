@@ -226,7 +226,7 @@ function ThemeToggle({ theme, onToggle }) {
 function HeaderActions({ onShowOnboarding, onOpenService, theme, onToggleTheme }) {
   return (
     <div className="view-actions">
-      <button className="service-entry-button" type="button" onClick={onOpenService}>Войти / регистрация</button>
+      <button className="service-entry-button" type="button" onClick={onOpenService}>Войти в сервис</button>
       <button className="help-button" type="button" onClick={onShowOnboarding}>Как это работает</button>
       <ThemeToggle theme={theme} onToggle={onToggleTheme} />
     </div>
