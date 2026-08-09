@@ -73,6 +73,30 @@ export function openMiniAppRedirect(mode, customUrl, communityId) {
   return true;
 }
 
+export async function openExternalServiceLink(serviceUrl) {
+  let targetUrl;
+  try {
+    const parsed = new URL(String(serviceUrl || '').trim());
+    if (parsed.protocol !== 'https:') throw new Error('insecure_protocol');
+    targetUrl = parsed.toString();
+  } catch (error) {
+    throw new Error('Адрес сервиса PAPA BOT настроен неверно.');
+  }
+
+  try {
+    await sendBridgeWithTimeout(
+      'VKWebAppOpenLink',
+      { link: targetUrl },
+      'VK не отвечает. Откройте сервис PAPA BOT в браузере и повторите попытку.'
+    );
+    return true;
+  } catch (error) {
+    const opened = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    if (opened) return true;
+    throw new Error('Не удалось открыть сервис PAPA BOT. Разрешите открытие внешних ссылок и повторите попытку.');
+  }
+}
+
 export async function initVkBridge() {
   try {
     await sendBridgeWithTimeout(

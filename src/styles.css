@@ -491,7 +491,8 @@ button {
 .primary-button,
 .back-button,
 .secondary-button,
-.help-button {
+.help-button,
+.service-entry-button {
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -519,6 +520,21 @@ button {
   background: var(--surface-soft);
   color: var(--text-secondary);
   font-weight: 700;
+}
+
+.service-entry-button {
+  min-height: 36px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.service-entry-button-onboarding {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 44px;
 }
 
 .secondary-button {
@@ -672,6 +688,10 @@ button {
   }
 
   .help-button {
+    white-space: normal;
+  }
+
+  .service-entry-button {
     white-space: normal;
   }
 }
