@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
+import { createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
 import { allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
@@ -324,11 +324,39 @@ function GroupDetail({ group, busy, onBack, onToggle }) {
   );
 }
 
+function AdminWorkspace({ groups, busy, onBack, onCreate }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!title.trim()) return;
+    await onCreate({ title, description });
+    setTitle('');
+    setDescription('');
+  };
+  return (
+    <section className="admin-workspace" aria-labelledby="admin-workspace-title">
+      <button className="back-button" type="button" onClick={onBack}>{COPY.back}</button>
+      <p className="admin-workspace-kicker">PAPA BOT · Администратору</p>
+      <h1 id="admin-workspace-title">Направления подписок</h1>
+      <p>Добавьте направление — оно сразу появится у пользователей этого сообщества.</p>
+      <form className="admin-group-form" onSubmit={submit}>
+        <label>Название<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength="80" placeholder="Например, Новости" required /></label>
+        <label>Описание<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength="500" placeholder="Что получит подписчик" /></label>
+        <button className="primary-button" type="submit" disabled={busy}>{busy ? COPY.saving : 'Добавить направление'}</button>
+      </form>
+      <h2>Опубликовано</h2>
+      {groups.length ? <ul className="admin-group-list">{groups.map((group) => <li key={group.slug}><strong>{group.title}</strong><span>{group.description || 'Без описания'}</span></li>)}</ul> : <p className="admin-workspace-empty">Пока нет ни одного направления.</p>}
+    </section>
+  );
+}
+
 export default function App() {
   const launchParams = useMemo(() => parseLaunchParams(), []);
   const themeStorageKey = useMemo(() => getThemeStorageKey(launchParams.vk_user_id), [launchParams.vk_user_id]);
   const [theme, setTheme] = useState(() => getInitialTheme(themeStorageKey));
   const [state, setState] = useState(EMPTY_STATE);
+  const [adminGroups, setAdminGroups] = useState([]);
   const [busy, setBusy] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
 
@@ -341,9 +369,13 @@ export default function App() {
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro }));
+    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro, admin: route.admin }));
     try {
-      if (route.slug) {
+      if (route.admin) {
+        const data = await loadAdminGroups(communityId, launchParams);
+        setAdminGroups(data.groups || []);
+        setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, admin: true });
+      } else if (route.slug) {
         const data = await loadGroup(communityId, route.slug, launchParams);
         const rememberedSubscribed = readRememberedSubscription(launchParams.vk_user_id, communityId, route.slug);
         const group = data.group && rememberedSubscribed ? { ...data.group, subscribed: true } : data.group;
@@ -393,6 +425,8 @@ export default function App() {
 
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);
+  const openAdmin = () => { window.location.hash = new URLSearchParams({ c: state.communityId, admin: '1' }).toString(); };
+  const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const completeOnboarding = () => {
     rememberCompletedOnboarding();
     setShowOnboarding(false);
@@ -444,6 +478,19 @@ export default function App() {
     }
   };
 
+  const addAdminGroup = async (group) => {
+    if (!state.communityId) return;
+    setBusy(true);
+    try {
+      const data = await createAdminGroup(state.communityId, group, launchParams);
+      setAdminGroups((current) => [...current, data.group]);
+    } catch (error) {
+      setState((prev) => ({ ...prev, error: error.message || COPY.loadFailed }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (showOnboarding) {
     return <Onboarding onComplete={completeOnboarding} />;
   }
@@ -467,7 +514,12 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      {state.group ? (
+      {state.admin ? (
+        <>
+          {state.error ? <div className="inline-error">{state.error}</div> : null}
+          <AdminWorkspace groups={adminGroups} busy={busy} onBack={backToList} onCreate={addAdminGroup} />
+        </>
+      ) : state.group ? (
         <>
           <div className="detail-toolbar">
             <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
@@ -480,7 +532,7 @@ export default function App() {
           {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
-            {!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
+            <div className="view-actions">{canManageCommunity ? <button className="help-button" type="button" onClick={openAdmin}>Настроить</button> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
           </header>
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {state.groups.length ? (

@@ -73,3 +73,15 @@ export function unsubscribeGroup(communityId, slug, launchParams) {
     body: JSON.stringify({ launchParams })
   });
 }
+
+export function loadAdminGroups(communityId, launchParams) {
+  return requestJson(buildUrl(appendLaunchParams({ miniapp: 'admin-groups', c: communityId }, launchParams)));
+}
+
+export function createAdminGroup(communityId, group, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'admin-create-group', c: communityId }), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, group })
+  });
+}

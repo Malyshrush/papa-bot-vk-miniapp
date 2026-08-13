@@ -25,7 +25,8 @@ export function parseRouteHash() {
   const params = new URLSearchParams(raw);
   return {
     communityId: params.get('c') || '',
-    slug: params.get('g') || ''
+    slug: params.get('g') || '',
+    admin: params.get('admin') === '1'
   };
 }
 

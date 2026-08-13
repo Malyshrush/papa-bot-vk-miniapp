@@ -695,3 +695,14 @@ button {
     white-space: normal;
   }
 }
+
+.admin-workspace { display:grid; gap:16px; padding:8px 0; }
+.admin-workspace h1, .admin-workspace h2, .admin-workspace p { margin:0; }
+.admin-workspace-kicker { color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+.admin-group-form { display:grid; gap:12px; padding:16px; border:1px solid var(--border); border-radius:18px; background:var(--surface); }
+.admin-group-form label { display:grid; gap:6px; color:var(--text); font-weight:700; font-size:14px; }
+.admin-group-form input, .admin-group-form textarea { width:100%; border:1px solid var(--border); border-radius:12px; background:var(--page); color:var(--text); padding:11px 12px; font:inherit; }
+.admin-group-form textarea { min-height:88px; resize:vertical; }
+.admin-group-list { list-style:none; display:grid; gap:8px; padding:0; margin:0; }
+.admin-group-list li { display:grid; gap:3px; padding:13px; border:1px solid var(--border); border-radius:14px; background:var(--surface); }
+.admin-group-list span, .admin-workspace-empty { color:var(--text-subtle); }
