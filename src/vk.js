@@ -98,3 +98,11 @@ export async function allowMessagesFromGroup(communityId) {
     'VK не отвечает. Откройте Приложение авторизовавшись в VK или повторите попытку.'
   );
 }
+
+export async function addMiniAppToCommunity() {
+  return sendBridgeWithTimeout(
+    'VKWebAppAddToCommunity',
+    { hide_success_modal: false },
+    'VK не отвечает. Откройте Mini App внутри VK и повторите попытку.'
+  );
+}

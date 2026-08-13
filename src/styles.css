@@ -537,6 +537,29 @@ button {
   min-height: 44px;
 }
 
+.community-install-action {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.community-install-action .primary-button {
+  min-width: 220px;
+}
+
+.community-install-action span,
+.community-install-action strong {
+  max-width: 620px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.community-install-action strong {
+  color: var(--accent);
+}
+
 .secondary-button {
   min-height: 44px;
   padding: 0 16px;

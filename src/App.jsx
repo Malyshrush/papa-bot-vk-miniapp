@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
-const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
+const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
 const DEFAULT_ACTION_COLOR = '#2f6fed';
 const ONBOARDING_VERSION = '2026-07-28-v1';
 const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
@@ -228,7 +228,7 @@ function HeaderActions({ onShowOnboarding, theme, onToggleTheme }) {
   );
 }
 
-function ServiceIntro({ onShowOnboarding, theme, onToggleTheme }) {
+function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, installNotice, onAddToCommunity }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
@@ -238,6 +238,13 @@ function ServiceIntro({ onShowOnboarding, theme, onToggleTheme }) {
         </div>
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
+        <div className="community-install-action">
+          <button className="primary-button" type="button" disabled={installBusy} onClick={onAddToCommunity}>
+            {installBusy ? 'Открываем список сообществ...' : 'Добавить в сообщество'}
+          </button>
+          <span>Администратор сможет выбрать своё сообщество VK и добавить в него приложение.</span>
+          {installNotice ? <strong role="status">{installNotice}</strong> : null}
+        </div>
       </div>
     </section>
   );
@@ -358,6 +365,8 @@ export default function App() {
   const [state, setState] = useState(EMPTY_STATE);
   const [adminGroups, setAdminGroups] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installNotice, setInstallNotice] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
 
   const loadCurrentRoute = useCallback(async () => {
@@ -433,6 +442,22 @@ export default function App() {
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
 
+  const addToCommunity = async () => {
+    setInstallBusy(true);
+    setInstallNotice('');
+    try {
+      const result = await addMiniAppToCommunity();
+      const groupId = String(result?.group_id || '').trim();
+      setInstallNotice(groupId
+        ? `Приложение добавлено в сообщество ${groupId}. Откройте приложение из меню сообщества.`
+        : 'Приложение добавлено. Откройте приложение из меню сообщества.');
+    } catch (error) {
+      setInstallNotice(error?.message || 'Не удалось добавить приложение. Откройте Mini App внутри VK и повторите попытку.');
+    } finally {
+      setInstallBusy(false);
+    }
+  };
+
   const toggleSubscription = async () => {
     if (!state.group || !state.communityId) return;
     setBusy(true);
@@ -503,7 +528,7 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-          <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
+              <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} />
           <div className="inline-error">{state.error}</div>
           <LegalFooter />
         </main>
@@ -529,7 +554,7 @@ export default function App() {
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
+          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
             <div className="view-actions">{canManageCommunity ? <button className="help-button" type="button" onClick={openAdmin}>Настроить</button> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
