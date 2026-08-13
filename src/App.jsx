@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { allowMessagesFromGroup, initVkBridge, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
+import { allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '';
-const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
 const DEFAULT_ACTION_COLOR = '#2f6fed';
 const ONBOARDING_VERSION = '2026-07-28-v1';
 const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
@@ -125,7 +124,7 @@ function readRememberedSubscription(userId, communityId, slug) {
   }
 }
 
-function Onboarding({ onComplete, onOpenService }) {
+function Onboarding({ onComplete }) {
   const [stepIndex, setStepIndex] = useState(0);
   const step = ONBOARDING_STEPS[stepIndex];
   const isLast = stepIndex === ONBOARDING_STEPS.length - 1;
@@ -173,9 +172,6 @@ function Onboarding({ onComplete, onOpenService }) {
             {isLast ? 'Начать' : 'Далее'}
           </button>
         </div>
-        <button className="service-entry-button service-entry-button-onboarding" type="button" onClick={onOpenService}>
-          Я администратор — войти или зарегистрироваться
-        </button>
         <p className="onboarding-legal">
           Продолжая, вы принимаете <a href="./legal/terms.html" target="_blank" rel="noreferrer">условия использования</a>
           {' '}и <a href="./legal/privacy.html" target="_blank" rel="noreferrer">политику конфиденциальности</a>.
@@ -223,23 +219,22 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-function HeaderActions({ onShowOnboarding, onOpenService, theme, onToggleTheme }) {
+function HeaderActions({ onShowOnboarding, theme, onToggleTheme }) {
   return (
     <div className="view-actions">
-      <button className="service-entry-button" type="button" onClick={onOpenService}>Войти в сервис</button>
       <button className="help-button" type="button" onClick={onShowOnboarding}>Как это работает</button>
       <ThemeToggle theme={theme} onToggle={onToggleTheme} />
     </div>
   );
 }
 
-function ServiceIntro({ onShowOnboarding, onOpenService, theme, onToggleTheme }) {
+function ServiceIntro({ onShowOnboarding, theme, onToggleTheme }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
         <div className="intro-heading">
           <span className="intro-badge">VK Mini App</span>
-          <HeaderActions onShowOnboarding={onShowOnboarding} onOpenService={onOpenService} theme={theme} onToggleTheme={onToggleTheme} />
+          <HeaderActions onShowOnboarding={onShowOnboarding} theme={theme} onToggleTheme={onToggleTheme} />
         </div>
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
@@ -402,13 +397,6 @@ export default function App() {
     rememberCompletedOnboarding();
     setShowOnboarding(false);
   };
-  const openService = async () => {
-    try {
-      await openExternalServiceLink(PAPA_BOT_SERVICE_URL);
-    } catch (error) {
-      setState((currentState) => ({ ...currentState, error: error.message || 'Не удалось открыть сервис PAPA BOT.' }));
-    }
-  };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
 
   const toggleSubscription = async () => {
@@ -457,7 +445,7 @@ export default function App() {
   };
 
   if (showOnboarding) {
-    return <Onboarding onComplete={completeOnboarding} onOpenService={openService} />;
+    return <Onboarding onComplete={completeOnboarding} />;
   }
 
   if (state.loading) {
@@ -468,7 +456,7 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-          <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} onOpenService={openService} theme={theme} onToggleTheme={toggleTheme} />
+          <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
           <div className="inline-error">{state.error}</div>
           <LegalFooter />
         </main>
@@ -482,17 +470,17 @@ export default function App() {
       {state.group ? (
         <>
           <div className="detail-toolbar">
-            <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} onOpenService={openService} theme={theme} onToggleTheme={toggleTheme} />
+            <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
           </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
           <GroupDetail group={state.group} busy={busy} onBack={backToList} onToggle={toggleSubscription} />
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} onOpenService={openService} theme={theme} onToggleTheme={toggleTheme} /> : null}
+          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
-            {!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} onOpenService={openService} theme={theme} onToggleTheme={toggleTheme} /> : null}
+            {!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}
           </header>
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {state.groups.length ? (
