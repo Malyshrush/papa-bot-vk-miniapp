@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { addMiniAppToCommunity, allowMessagesFromGroup, initVkBridge, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, initVkBridge, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
+const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
 const DEFAULT_ACTION_COLOR = '#2f6fed';
 const ONBOARDING_VERSION = '2026-07-28-v1';
 const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
@@ -228,7 +229,7 @@ function HeaderActions({ onShowOnboarding, theme, onToggleTheme }) {
   );
 }
 
-function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, installNotice, onAddToCommunity }) {
+function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, installNotice, onAddToCommunity, onOpenService }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
@@ -239,9 +240,12 @@ function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, ins
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
         <div className="community-install-action">
-          <button className="primary-button" type="button" disabled={installBusy} onClick={onAddToCommunity}>
-            {installBusy ? 'Открываем список сообществ...' : 'Добавить в сообщество'}
-          </button>
+          <div className="service-entry-actions">
+            <button className="primary-button" type="button" disabled={installBusy} onClick={onAddToCommunity}>
+              {installBusy ? 'Открываем список сообществ...' : 'Добавить в сообщество'}
+            </button>
+            <button className="secondary-button" type="button" onClick={onOpenService}>Войти в сервис</button>
+          </div>
           <span>Администратор сможет выбрать своё сообщество VK и добавить в него приложение.</span>
           {installNotice ? <strong role="status">{installNotice}</strong> : null}
         </div>
@@ -441,6 +445,7 @@ export default function App() {
     setShowOnboarding(false);
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
+  const openService = () => { void openExternalServiceLink(PAPA_BOT_SERVICE_URL); };
 
   const addToCommunity = async () => {
     setInstallBusy(true);
@@ -528,7 +533,7 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-              <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} />
+              <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} onOpenService={openService} />
           <div className="inline-error">{state.error}</div>
           <LegalFooter />
         </main>
@@ -554,7 +559,7 @@ export default function App() {
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} /> : null}
+          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
             <div className="view-actions">{canManageCommunity ? <button className="help-button" type="button" onClick={openAdmin}>Настроить</button> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>

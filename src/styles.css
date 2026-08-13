@@ -544,8 +544,17 @@ button {
   margin-top: 18px;
 }
 
-.community-install-action .primary-button {
-  min-width: 220px;
+.service-entry-actions {
+  width: min(100%, 460px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.service-entry-actions .primary-button,
+.service-entry-actions .secondary-button {
+  width: 100%;
+  min-height: 44px;
 }
 
 .community-install-action span,
@@ -685,6 +694,10 @@ button {
   .intro-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .service-entry-actions {
+    grid-template-columns: 1fr;
   }
 
   .view-actions {

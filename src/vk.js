@@ -106,3 +106,26 @@ export async function addMiniAppToCommunity() {
     'VK не отвечает. Откройте Mini App внутри VK и повторите попытку.'
   );
 }
+
+export async function openExternalServiceLink(url) {
+  let serviceUrl;
+  try {
+    const parsedUrl = new URL(String(url || '').trim());
+    if (parsedUrl.protocol !== 'https:') return false;
+    serviceUrl = parsedUrl.toString();
+  } catch (error) {
+    return false;
+  }
+
+  try {
+    await sendBridgeWithTimeout(
+      'VKWebAppOpenLink',
+      { url: serviceUrl },
+      'VK не отвечает. Открываем сервис в отдельной вкладке.'
+    );
+    return true;
+  } catch (error) {
+    window.open(serviceUrl, '_blank', 'noopener,noreferrer');
+    return true;
+  }
+}
