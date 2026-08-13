@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { addMiniAppToCommunity, allowMessagesFromGroup, initVkBridge, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
 const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
@@ -403,7 +403,6 @@ export default function App() {
   }, [launchParams]);
 
   useEffect(() => {
-    initVkBridge();
     loadCurrentRoute();
     window.addEventListener('hashchange', loadCurrentRoute);
     return () => window.removeEventListener('hashchange', loadCurrentRoute);
