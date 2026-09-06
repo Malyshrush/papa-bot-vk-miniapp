@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { connectVkUserToken, createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
+import { completeVkHandoff, createAdminGroup, createCabinetLogin, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
@@ -20,7 +20,9 @@ const EMPTY_STATE = {
   group: null,
   intro: false,
   admin: false,
-  connectUserToken: false
+  connectUserToken: false,
+  handoff: '',
+  handoffTicket: ''
 };
 
 const COPY = {
@@ -231,7 +233,7 @@ function HeaderActions({ onShowOnboarding, theme, onToggleTheme }) {
   );
 }
 
-function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, installNotice, onAddToCommunity, onOpenService }) {
+function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, installNotice, cabinetBusy, onAddToCommunity, onOpenService }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
@@ -246,7 +248,7 @@ function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, ins
             <button className="primary-button" type="button" disabled={installBusy} onClick={onAddToCommunity}>
               {installBusy ? 'Открываем список сообществ...' : 'Добавить в сообщество'}
             </button>
-            <button className="secondary-button" type="button" onClick={onOpenService}>Открыть кабинет PAPA BOT</button>
+            <button className="secondary-button" type="button" disabled={cabinetBusy} onClick={onOpenService}>{cabinetBusy ? 'Открываем кабинет...' : 'Кабинет в PAPA BOT'}</button>
           </div>
           <span>Администратор сможет выбрать своё сообщество VK и добавить в него приложение.</span>
           {installNotice ? <strong role="status">{installNotice}</strong> : null}
@@ -256,16 +258,21 @@ function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, ins
   );
 }
 
-function VkUserTokenConnect({ busy, error, notice, onConnect }) {
+function VkHandoffConnect({ purpose, busy, error, notice, onConnect }) {
+  const content = purpose === 'link_vk'
+    ? { title: 'Привязка VK к профилю', text: 'Подтвердите привязку текущего аккаунта VK к открытому профилю PAPA BOT.', security: 'Пароль и отдельная страница VK ID не нужны.', action: 'Подтвердить привязку', busy: 'Привязываем VK...' }
+    : purpose === 'login'
+      ? { title: 'Вход в PAPA BOT', text: 'Подтвердите вход текущим аккаунтом VK.', security: 'После подтверждения вернитесь во вкладку кабинета — вход завершится автоматически.', action: 'Продолжить вход', busy: 'Подтверждаем вход...' }
+      : { title: 'Доступ к функциям сообщества', text: 'Подтвердите разрешения аккаунтом, который является администратором выбранного сообщества.', security: 'Ключ доступа передаётся напрямую серверу PAPA BOT, не показывается в кабинете и не сохраняется в браузере.', action: 'Предоставить доступ', busy: 'Подключаем VK...' };
   return (
     <main className="vk-login-shell">
       <section className="vk-login-card" aria-labelledby="vk-login-title">
         <span className="intro-badge">PAPA BOT · VK</span>
-        <h1 id="vk-login-title">Подключение аккаунта VK</h1>
-        <p>Войдите аккаунтом, который является администратором выбранного сообщества, и подтвердите запрошенные разрешения.</p>
-        <p className="vk-login-security">Ключ доступа передаётся напрямую серверу PAPA BOT, не показывается в кабинете и не сохраняется в браузере.</p>
-        <button className="primary-button vk-login-button" type="button" disabled={busy} onClick={onConnect}>
-          {busy ? 'Подключаем VK...' : 'Войти через ВК'}
+        <h1 id="vk-login-title">{content.title}</h1>
+        <p>{content.text}</p>
+        <p className="vk-login-security">{content.security}</p>
+        <button className="primary-button vk-login-button" type="button" disabled={busy || !!notice} onClick={onConnect}>
+          {busy ? content.busy : content.action}
         </button>
         {notice ? <strong className="vk-login-success" role="status">{notice}</strong> : null}
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -392,9 +399,10 @@ export default function App() {
   const [adminGroups, setAdminGroups] = useState([]);
   const [busy, setBusy] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
+  const [cabinetBusy, setCabinetBusy] = useState(false);
   const [installNotice, setInstallNotice] = useState('');
   const [connectNotice, setConnectNotice] = useState('');
-  const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.connectUserToken && !hasCompletedOnboarding());
+  const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !hasCompletedOnboarding());
 
   const loadCurrentRoute = useCallback(async () => {
     const route = parseRouteHash();
@@ -405,13 +413,13 @@ export default function App() {
       return;
     }
 
-    if (route.connectUserToken) {
+    if (route.handoff && route.handoffTicket) {
       setShowOnboarding(false);
-      setState({ ...EMPTY_STATE, loading: false, communityId, intro: false, connectUserToken: true });
+      setState({ ...EMPTY_STATE, loading: false, communityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket });
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro, admin: route.admin, connectUserToken: false }));
+    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro, admin: route.admin, connectUserToken: false, handoff: '', handoffTicket: '' }));
     try {
       if (route.admin) {
         const data = await loadAdminGroups(communityId, launchParams);
@@ -473,10 +481,26 @@ export default function App() {
     setShowOnboarding(false);
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
-  const openService = () => { void openExternalServiceLink(PAPA_BOT_SERVICE_URL); };
+  const openService = async () => {
+    setCabinetBusy(true);
+    setInstallNotice('');
+    try {
+      if (!launchParams.sign || !launchParams.vk_user_id) {
+        await openExternalServiceLink(PAPA_BOT_SERVICE_URL);
+        return;
+      }
+      const handoff = await createCabinetLogin(launchParams);
+      if (!handoff.ticket) throw new Error('Сервер не создал запрос входа.');
+      await openExternalServiceLink(`${PAPA_BOT_SERVICE_URL}?vkMiniAppCabinet=${encodeURIComponent(handoff.ticket)}`);
+    } catch (error) {
+      setInstallNotice(error?.message || 'Не удалось открыть кабинет PAPA BOT.');
+    } finally {
+      setCabinetBusy(false);
+    }
+  };
 
-  const connectUserToken = async () => {
-    if (!state.communityId) return;
+  const completeHandoff = async () => {
+    if (!state.handoff || !state.handoffTicket) return;
     setBusy(true);
     setConnectNotice('');
     setState((prev) => ({ ...prev, error: '' }));
@@ -484,9 +508,14 @@ export default function App() {
       if (!launchParams.sign || !launchParams.vk_user_id) {
         throw new Error('Откройте приложение PAPA BOT внутри VK и повторите вход.');
       }
-      const tokenGrant = await requestPapaBotUserToken();
-      await connectVkUserToken(state.communityId, tokenGrant.accessToken, tokenGrant.scope, launchParams);
-      setConnectNotice('VK успешно подключён. Вернитесь в кабинет PAPA BOT — статус обновится автоматически.');
+      const payload = {};
+      if (state.handoff === 'user_token') {
+        const tokenGrant = await requestPapaBotUserToken();
+        payload.accessToken = tokenGrant.accessToken;
+        payload.scope = tokenGrant.scope;
+      }
+      const result = await completeVkHandoff(state.handoffTicket, payload, launchParams);
+      setConnectNotice(result.message || (state.handoff === 'link_vk' ? 'VK успешно привязан. Вернитесь в кабинет PAPA BOT.' : state.handoff === 'login' ? 'Вход подтверждён. Вернитесь во вкладку кабинета.' : 'VK успешно подключён. Вернитесь в кабинет PAPA BOT.'));
     } catch (error) {
       setState((prev) => ({ ...prev, error: error?.message || 'Не удалось подключить VK. Повторите попытку.' }));
     } finally {
@@ -576,15 +605,15 @@ export default function App() {
     return <StatusView title={COPY.loading} text={COPY.loadingGroups} />;
   }
 
-  if (state.connectUserToken) {
-    return <VkUserTokenConnect busy={busy} error={state.error} notice={connectNotice} onConnect={connectUserToken} />;
+  if (state.handoff && state.handoffTicket) {
+    return <VkHandoffConnect purpose={state.handoff} busy={busy} error={state.error} notice={connectNotice} onConnect={completeHandoff} />;
   }
 
   if (state.error && !state.group && state.groups.length === 0) {
     if (state.intro) {
       return (
         <main className="app-shell">
-              <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} onOpenService={openService} />
+              <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
           <div className="inline-error">{state.error}</div>
           <LegalFooter />
         </main>
@@ -610,7 +639,7 @@ export default function App() {
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
+          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
             <div className="view-actions">{canManageCommunity ? <button className="help-button" type="button" onClick={openAdmin}>Настроить</button> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>

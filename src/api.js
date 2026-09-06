@@ -86,10 +86,18 @@ export function createAdminGroup(communityId, group, launchParams) {
   });
 }
 
-export function connectVkUserToken(communityId, accessToken, scope, launchParams) {
-  return requestJson(buildUrl({ miniapp: 'connect-user-token', c: communityId }), {
+export function completeVkHandoff(ticket, payload, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'complete-handoff' }), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ communityId, accessToken, scope, launchParams })
+    body: JSON.stringify({ ticket, ...(payload || {}), launchParams })
+  });
+}
+
+export function createCabinetLogin(launchParams) {
+  return requestJson(buildUrl({ miniapp: 'create-cabinet-login' }), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams })
   });
 }

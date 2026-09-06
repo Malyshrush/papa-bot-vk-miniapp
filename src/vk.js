@@ -26,11 +26,14 @@ export function parseLaunchParams() {
 export function parseRouteHash() {
   const raw = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(raw);
+  const handoff = String(params.get('handoff') || '').trim();
   return {
     communityId: params.get('c') || '',
     slug: params.get('g') || '',
     admin: params.get('admin') === '1',
-    connectUserToken: params.get('connect') === 'token'
+    handoff,
+    handoffTicket: params.get('t') || '',
+    connectUserToken: handoff === 'user_token'
   };
 }
 
