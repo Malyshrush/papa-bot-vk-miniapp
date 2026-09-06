@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, setGroupHash } from './vk.js';
+import { connectVkUserToken, createAdminGroup, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
 const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
@@ -18,7 +18,9 @@ const EMPTY_STATE = {
   slug: '',
   groups: [],
   group: null,
-  intro: false
+  intro: false,
+  admin: false,
+  connectUserToken: false
 };
 
 const COPY = {
@@ -244,13 +246,32 @@ function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, ins
             <button className="primary-button" type="button" disabled={installBusy} onClick={onAddToCommunity}>
               {installBusy ? 'Открываем список сообществ...' : 'Добавить в сообщество'}
             </button>
-            <button className="secondary-button" type="button" onClick={onOpenService}>Войти в сервис</button>
+            <button className="secondary-button" type="button" onClick={onOpenService}>Открыть кабинет PAPA BOT</button>
           </div>
           <span>Администратор сможет выбрать своё сообщество VK и добавить в него приложение.</span>
           {installNotice ? <strong role="status">{installNotice}</strong> : null}
         </div>
       </div>
     </section>
+  );
+}
+
+function VkUserTokenConnect({ busy, error, notice, onConnect }) {
+  return (
+    <main className="vk-login-shell">
+      <section className="vk-login-card" aria-labelledby="vk-login-title">
+        <span className="intro-badge">PAPA BOT · VK</span>
+        <h1 id="vk-login-title">Подключение аккаунта VK</h1>
+        <p>Войдите аккаунтом, который является администратором выбранного сообщества, и подтвердите запрошенные разрешения.</p>
+        <p className="vk-login-security">Ключ доступа передаётся напрямую серверу PAPA BOT, не показывается в кабинете и не сохраняется в браузере.</p>
+        <button className="primary-button vk-login-button" type="button" disabled={busy} onClick={onConnect}>
+          {busy ? 'Подключаем VK...' : 'Войти через ВК'}
+        </button>
+        {notice ? <strong className="vk-login-success" role="status">{notice}</strong> : null}
+        {error ? <div className="inline-error" role="alert">{error}</div> : null}
+      </section>
+      <LegalFooter />
+    </main>
   );
 }
 
@@ -364,6 +385,7 @@ function AdminWorkspace({ groups, busy, onBack, onCreate }) {
 
 export default function App() {
   const launchParams = useMemo(() => parseLaunchParams(), []);
+  const initialRoute = useMemo(() => parseRouteHash(), []);
   const themeStorageKey = useMemo(() => getThemeStorageKey(launchParams.vk_user_id), [launchParams.vk_user_id]);
   const [theme, setTheme] = useState(() => getInitialTheme(themeStorageKey));
   const [state, setState] = useState(EMPTY_STATE);
@@ -371,7 +393,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
   const [installNotice, setInstallNotice] = useState('');
-  const [showOnboarding, setShowOnboarding] = useState(() => !hasCompletedOnboarding());
+  const [connectNotice, setConnectNotice] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.connectUserToken && !hasCompletedOnboarding());
 
   const loadCurrentRoute = useCallback(async () => {
     const route = parseRouteHash();
@@ -382,7 +405,13 @@ export default function App() {
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro, admin: route.admin }));
+    if (route.connectUserToken) {
+      setShowOnboarding(false);
+      setState({ ...EMPTY_STATE, loading: false, communityId, intro: false, connectUserToken: true });
+      return;
+    }
+
+    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro, admin: route.admin, connectUserToken: false }));
     try {
       if (route.admin) {
         const data = await loadAdminGroups(communityId, launchParams);
@@ -445,6 +474,25 @@ export default function App() {
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
   const openService = () => { void openExternalServiceLink(PAPA_BOT_SERVICE_URL); };
+
+  const connectUserToken = async () => {
+    if (!state.communityId) return;
+    setBusy(true);
+    setConnectNotice('');
+    setState((prev) => ({ ...prev, error: '' }));
+    try {
+      if (!launchParams.sign || !launchParams.vk_user_id) {
+        throw new Error('Откройте приложение PAPA BOT внутри VK и повторите вход.');
+      }
+      const tokenGrant = await requestPapaBotUserToken();
+      await connectVkUserToken(state.communityId, tokenGrant.accessToken, tokenGrant.scope, launchParams);
+      setConnectNotice('VK успешно подключён. Вернитесь в кабинет PAPA BOT — статус обновится автоматически.');
+    } catch (error) {
+      setState((prev) => ({ ...prev, error: error?.message || 'Не удалось подключить VK. Повторите попытку.' }));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const addToCommunity = async () => {
     setInstallBusy(true);
@@ -526,6 +574,10 @@ export default function App() {
 
   if (state.loading) {
     return <StatusView title={COPY.loading} text={COPY.loadingGroups} />;
+  }
+
+  if (state.connectUserToken) {
+    return <VkUserTokenConnect busy={busy} error={state.error} notice={connectNotice} onConnect={connectUserToken} />;
   }
 
   if (state.error && !state.group && state.groups.length === 0) {

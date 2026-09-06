@@ -1,11 +1,14 @@
 import bridge from '@vkontakte/vk-bridge';
 
 const VK_BRIDGE_TIMEOUT_MS = 7000;
+const VK_AUTH_TIMEOUT_MS = 120000;
+export const PAPA_BOT_VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID || 54600849);
+export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 'docs', 'wall', 'market']);
 
-function sendBridgeWithTimeout(method, params, timeoutMessage) {
+function sendBridgeWithTimeout(method, params, timeoutMessage, timeoutMs = VK_BRIDGE_TIMEOUT_MS) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
-    timeoutId = window.setTimeout(() => reject(new Error(timeoutMessage)), VK_BRIDGE_TIMEOUT_MS);
+    timeoutId = window.setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
   });
   return Promise.race([bridge.send(method, params), timeout])
     .finally(() => window.clearTimeout(timeoutId));
@@ -26,7 +29,8 @@ export function parseRouteHash() {
   return {
     communityId: params.get('c') || '',
     slug: params.get('g') || '',
-    admin: params.get('admin') === '1'
+    admin: params.get('admin') === '1',
+    connectUserToken: params.get('connect') === 'token'
   };
 }
 
@@ -105,6 +109,20 @@ export async function addMiniAppToCommunity() {
     { hide_success_modal: false },
     'VK не отвечает. Откройте Mini App внутри VK и повторите попытку.'
   );
+}
+
+export async function requestPapaBotUserToken() {
+  const result = await sendBridgeWithTimeout(
+    'VKWebAppGetAuthToken',
+    { app_id: PAPA_BOT_VK_APP_ID, scope: VK_USER_TOKEN_SCOPES.join(',') },
+    'VK не завершил авторизацию. Повторите вход и подтвердите разрешения.',
+    VK_AUTH_TIMEOUT_MS
+  );
+  const accessToken = String(result?.access_token || '').trim();
+  if (!accessToken) {
+    throw new Error('VK не выдал ключ доступа. Повторите вход и подтвердите разрешения.');
+  }
+  return { accessToken, scope: String(result?.scope || VK_USER_TOKEN_SCOPES.join(',')) };
 }
 
 export async function openExternalServiceLink(url) {

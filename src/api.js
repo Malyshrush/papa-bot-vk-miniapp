@@ -85,3 +85,11 @@ export function createAdminGroup(communityId, group, launchParams) {
     body: JSON.stringify({ launchParams, group })
   });
 }
+
+export function connectVkUserToken(communityId, accessToken, scope, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'connect-user-token', c: communityId }), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ communityId, accessToken, scope, launchParams })
+  });
+}

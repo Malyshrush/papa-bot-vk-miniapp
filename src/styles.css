@@ -742,3 +742,16 @@ button {
 .admin-group-list { list-style:none; display:grid; gap:8px; padding:0; margin:0; }
 .admin-group-list li { display:grid; gap:3px; padding:13px; border:1px solid var(--border); border-radius:14px; background:var(--surface); }
 .admin-group-list span, .admin-workspace-empty { color:var(--text-subtle); }
+
+.vk-login-shell { min-height:100vh; display:grid; align-content:center; gap:12px; width:min(100% - 28px, 620px); margin:0 auto; padding:28px 0; }
+.vk-login-card { display:grid; gap:16px; padding:30px; border:1px solid var(--border); border-radius:24px; background:var(--surface); box-shadow:var(--shadow-large); }
+.vk-login-card h1, .vk-login-card p { margin:0; }
+.vk-login-card p { color:var(--text-secondary); line-height:1.55; }
+.vk-login-security { padding:13px 15px; border:1px solid var(--accent-border); border-radius:14px; background:var(--accent-soft); }
+.vk-login-button { width:100%; }
+.vk-login-success { padding:12px 14px; border:1px solid var(--success-border); border-radius:12px; background:var(--success-bg); color:var(--success-text); }
+
+@media (max-width: 520px) {
+  .vk-login-shell { width:100%; padding:0; }
+  .vk-login-card { min-height:calc(100vh - 44px); border:0; border-radius:0; padding:24px 18px; }
+}
