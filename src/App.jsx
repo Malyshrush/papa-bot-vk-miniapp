@@ -493,6 +493,11 @@ export default function App() {
       if (!handoff.ticket) throw new Error('Сервер не создал запрос входа.');
       await openExternalServiceLink(`${PAPA_BOT_SERVICE_URL}?vkMiniAppCabinet=${encodeURIComponent(handoff.ticket)}`);
     } catch (error) {
+      if (error?.code === 'vk_profile_not_linked') {
+        setInstallNotice('Сначала войдите в кабинет обычным способом. После входа сразу откроется раздел ПРОФИЛЬ для привязки VK.');
+        await openExternalServiceLink(`${PAPA_BOT_SERVICE_URL}?linkVkAfterLogin=1`);
+        return;
+      }
       setInstallNotice(error?.message || 'Не удалось открыть кабинет PAPA BOT.');
     } finally {
       setCabinetBusy(false);

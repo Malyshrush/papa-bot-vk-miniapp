@@ -21,7 +21,9 @@ function buildUrl(params = {}) {
 async function readJson(response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.success === false) {
-    throw new Error(data.message || data.error || '\u041e\u0448\u0438\u0431\u043a\u0430 Mini App');
+    const error = new Error(data.message || data.error || '\u041e\u0448\u0438\u0431\u043a\u0430 Mini App');
+    error.code = String(data.error || '');
+    throw error;
   }
   return data;
 }
