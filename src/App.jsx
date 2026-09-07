@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { completeVkHandoff, createAdminGroup, createCabinetLogin, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
+import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
@@ -260,7 +260,7 @@ function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, ins
 
 function VkHandoffConnect({ purpose, busy, error, notice, onConnect }) {
   const content = purpose === 'link_vk'
-    ? { title: 'Привязка VK к профилю', text: 'Подтвердите привязку текущего аккаунта VK к открытому профилю PAPA BOT.', security: 'Пароль и отдельная страница VK ID не нужны.', action: 'Подтвердить привязку', busy: 'Привязываем VK...' }
+    ? { title: 'Привязка VK к профилю', text: 'Привяжите текущий аккаунт VK и сразу предоставьте доступ к функциям выбранного сообщества.', security: 'VK ID и доступ подключаются за один проход. Ключ передаётся только серверу PAPA BOT и не сохраняется в браузере.', action: 'Привязать VK', busy: 'Привязываем VK...' }
     : purpose === 'login'
       ? { title: 'Вход в PAPA BOT', text: 'Подтвердите вход текущим аккаунтом VK.', security: 'После подтверждения вернитесь во вкладку кабинета — вход завершится автоматически.', action: 'Продолжить вход', busy: 'Подтверждаем вход...' }
       : { title: 'Доступ к функциям сообщества', text: 'Подтвердите разрешения аккаунтом, который является администратором выбранного сообщества.', security: 'Ключ доступа передаётся напрямую серверу PAPA BOT, не показывается в кабинете и не сохраняется в браузере.', action: 'Предоставить доступ', busy: 'Подключаем VK...' };
@@ -406,6 +406,7 @@ export default function App() {
 
   const loadCurrentRoute = useCallback(async () => {
     const route = parseRouteHash();
+    const handoffCommunityId = route.communityId || launchParams.vk_group_id || '';
     const communityId = route.communityId || launchParams.vk_group_id || DEFAULT_COMMUNITY_ID;
     const intro = !route.communityId && !launchParams.vk_group_id;
     if (!communityId) {
@@ -415,7 +416,7 @@ export default function App() {
 
     if (route.handoff && route.handoffTicket) {
       setShowOnboarding(false);
-      setState({ ...EMPTY_STATE, loading: false, communityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket });
+      setState({ ...EMPTY_STATE, loading: false, communityId: handoffCommunityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket });
       return;
     }
 
@@ -514,15 +515,23 @@ export default function App() {
         throw new Error('Откройте приложение PAPA BOT внутри VK и повторите вход.');
       }
       const payload = {};
-      if (state.handoff === 'user_token') {
+      if (state.handoff === 'user_token' || (state.handoff === 'link_vk' && state.communityId)) {
         const tokenGrant = await requestPapaBotUserToken();
         payload.accessToken = tokenGrant.accessToken;
         payload.scope = tokenGrant.scope;
       }
       const result = await completeVkHandoff(state.handoffTicket, payload, launchParams);
-      setConnectNotice(result.message || (state.handoff === 'link_vk' ? 'VK успешно привязан. Вернитесь в кабинет PAPA BOT.' : state.handoff === 'login' ? 'Вход подтверждён. Вернитесь во вкладку кабинета.' : 'VK успешно подключён. Вернитесь в кабинет PAPA BOT.'));
+      if (result.linked && result.connected === false && result.connectionError) {
+        setState((prev) => ({ ...prev, error: result.message || 'VK ID привязан, но доступ к сообществу не получен. Повторите попытку.' }));
+      } else {
+        setConnectNotice(result.message || (state.handoff === 'link_vk' ? 'VK успешно привязан. Вернитесь в кабинет PAPA BOT.' : state.handoff === 'login' ? 'Вход подтверждён. Вернитесь во вкладку кабинета.' : 'VK успешно подключён. Вернитесь в кабинет PAPA BOT.'));
+      }
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error?.message || 'Не удалось подключить VK. Повторите попытку.' }));
+      let failure = null;
+      if (state.handoff === 'link_vk' || state.handoff === 'user_token') {
+        failure = await failVkHandoff(state.handoffTicket, error?.handoffReason || 'vk_bridge_failed', launchParams).catch(() => null);
+      }
+      setState((prev) => ({ ...prev, error: failure?.message || error?.message || 'Не удалось подключить VK. Повторите попытку.' }));
     } finally {
       setBusy(false);
     }

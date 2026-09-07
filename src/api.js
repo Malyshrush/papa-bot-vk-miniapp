@@ -96,6 +96,14 @@ export function completeVkHandoff(ticket, payload, launchParams) {
   });
 }
 
+export function failVkHandoff(ticket, reason, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'fail-handoff' }), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticket, reason, launchParams })
+  });
+}
+
 export function createCabinetLogin(launchParams) {
   return requestJson(buildUrl({ miniapp: 'create-cabinet-login' }), {
     method: 'POST',
