@@ -115,12 +115,21 @@ export async function addMiniAppToCommunity() {
 }
 
 export async function requestPapaBotUserToken() {
-  const result = await sendBridgeWithTimeout(
-    'VKWebAppGetAuthToken',
-    { app_id: PAPA_BOT_VK_APP_ID, scope: VK_USER_TOKEN_SCOPES.join(',') },
-    'VK не завершил авторизацию. Повторите вход и подтвердите разрешения.',
-    VK_AUTH_TIMEOUT_MS
-  );
+  let result;
+  try {
+    result = await sendBridgeWithTimeout(
+      'VKWebAppGetAuthToken',
+      { app_id: PAPA_BOT_VK_APP_ID, scope: VK_USER_TOKEN_SCOPES.join(',') },
+      'VK не завершил авторизацию. Повторите вход и подтвердите разрешения.',
+      VK_AUTH_TIMEOUT_MS
+    );
+  } catch (error) {
+    const text = String(error?.error_data?.error_reason || error?.error_type || error?.message || '').toLowerCase();
+    error.handoffReason = text.includes('denied') || text.includes('cancel') || text.includes('отклон')
+      ? 'vk_access_denied'
+      : (text.includes('авторизац') || text.includes('timeout') ? 'vk_auth_timeout' : 'vk_bridge_failed');
+    throw error;
+  }
   const accessToken = String(result?.access_token || '').trim();
   if (!accessToken) {
     throw new Error('VK не выдал ключ доступа. Повторите вход и подтвердите разрешения.');
