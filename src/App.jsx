@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createLoginAutoStart } from './handoff-login.js';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
@@ -262,7 +263,7 @@ function VkHandoffConnect({ purpose, busy, error, notice, onConnect }) {
   const content = purpose === 'link_vk'
     ? { title: 'Привязка VK к профилю', text: 'Привяжите текущий аккаунт VK и сразу предоставьте доступ к функциям выбранного сообщества.', security: 'VK ID и доступ подключаются за один проход. Ключ передаётся только серверу PAPA BOT и не сохраняется в браузере.', action: 'Привязать VK', busy: 'Привязываем VK...' }
     : purpose === 'login'
-      ? { title: 'Вход в PAPA BOT', text: 'Подтвердите вход текущим аккаунтом VK.', security: 'После подтверждения вернитесь во вкладку кабинета — вход завершится автоматически.', action: 'Продолжить вход', busy: 'Подтверждаем вход...' }
+      ? { title: 'Вход в PAPA BOT', text: 'Проверяем текущий аккаунт VK…', security: 'Кабинет завершит вход автоматически и попробует закрыть это окно. Если окно останется открытым, кабинет уже можно открыть в исходной вкладке.', action: 'Повторить вход', busy: 'Подтверждаем вход...' }
       : { title: 'Доступ к функциям сообщества', text: 'Подтвердите разрешения аккаунтом, который является администратором выбранного сообщества.', security: 'Ключ доступа передаётся напрямую серверу PAPA BOT, не показывается в кабинете и не сохраняется в браузере.', action: 'Предоставить доступ', busy: 'Подключаем VK...' };
   return (
     <main className="vk-login-shell">
@@ -271,9 +272,9 @@ function VkHandoffConnect({ purpose, busy, error, notice, onConnect }) {
         <h1 id="vk-login-title">{content.title}</h1>
         <p>{content.text}</p>
         <p className="vk-login-security">{content.security}</p>
-        <button className="primary-button vk-login-button" type="button" disabled={busy || !!notice} onClick={onConnect}>
+        {purpose !== 'login' || error ? <button className="primary-button vk-login-button" type="button" disabled={busy || !!notice} onClick={onConnect}>
           {busy ? content.busy : content.action}
-        </button>
+        </button> : null}
         {notice ? <strong className="vk-login-success" role="status">{notice}</strong> : null}
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
       </section>
@@ -391,6 +392,8 @@ function AdminWorkspace({ groups, busy, onBack, onCreate }) {
 }
 
 export default function App() {
+  const autoStartLogin = useMemo(() => createLoginAutoStart(), []);
+  const completingHandoff = useRef(false);
   const launchParams = useMemo(() => parseLaunchParams(), []);
   const initialRoute = useMemo(() => parseRouteHash(), []);
   const themeStorageKey = useMemo(() => getThemeStorageKey(launchParams.vk_user_id), [launchParams.vk_user_id]);
@@ -416,7 +419,7 @@ export default function App() {
 
     if (route.handoff && route.handoffTicket) {
       setShowOnboarding(false);
-      setState({ ...EMPTY_STATE, loading: false, communityId: handoffCommunityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket });
+      setState({ ...EMPTY_STATE, loading: false, communityId: handoffCommunityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket, error: !launchParams.sign || !launchParams.vk_user_id ? 'Откройте вход кнопкой «Войти через VK» в кабинете PAPA BOT: для проверки аккаунта нужен запуск внутри VK.' : '' });
       return;
     }
 
@@ -463,7 +466,7 @@ export default function App() {
   }, [theme, themeStorageKey]);
 
   useEffect(() => {
-    if (!state.error) return undefined;
+    if (!state.error || state.handoff) return undefined;
     const currentNotice = state.error;
     const noticeTimeoutId = window.setTimeout(() => {
       setState((currentState) => currentState.error === currentNotice
@@ -471,7 +474,7 @@ export default function App() {
         : currentState);
     }, NOTICE_DURATION_MS);
     return () => window.clearTimeout(noticeTimeoutId);
-  }, [state.error]);
+  }, [state.error, state.handoff]);
 
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);
@@ -506,7 +509,8 @@ export default function App() {
   };
 
   const completeHandoff = async () => {
-    if (!state.handoff || !state.handoffTicket) return;
+    if (!state.handoff || !state.handoffTicket || completingHandoff.current) return;
+    completingHandoff.current = true;
     setBusy(true);
     setConnectNotice('');
     setState((prev) => ({ ...prev, error: '' }));
@@ -524,7 +528,7 @@ export default function App() {
       if (result.linked && result.connected === false && result.connectionError) {
         setState((prev) => ({ ...prev, error: result.message || 'VK ID привязан, но доступ к сообществу не получен. Повторите попытку.' }));
       } else {
-        setConnectNotice(result.message || (state.handoff === 'link_vk' ? 'VK успешно привязан. Вернитесь в кабинет PAPA BOT.' : state.handoff === 'login' ? 'Вход подтверждён. Вернитесь во вкладку кабинета.' : 'VK успешно подключён. Вернитесь в кабинет PAPA BOT.'));
+        setConnectNotice(state.handoff === 'login' ? 'Аккаунт VK подтверждён. Кабинет автоматически завершает вход.' : (result.message || 'VK подключён. Кабинет обновится автоматически.'));
       }
     } catch (error) {
       let failure = null;
@@ -533,9 +537,14 @@ export default function App() {
       }
       setState((prev) => ({ ...prev, error: failure?.message || error?.message || 'Не удалось подключить VK. Повторите попытку.' }));
     } finally {
+      completingHandoff.current = false;
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    autoStartLogin(state, launchParams, completeHandoff);
+  }, [state.handoff, state.handoffTicket, launchParams, autoStartLogin]);
 
   const addToCommunity = async () => {
     setInstallBusy(true);
