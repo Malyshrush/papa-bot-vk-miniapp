@@ -134,7 +134,7 @@ export async function requestPapaBotUserToken() {
   if (!accessToken) {
     throw new Error('VK не выдал ключ доступа. Повторите вход и подтвердите разрешения.');
   }
-  return { accessToken, scope: String(result?.scope || VK_USER_TOKEN_SCOPES.join(',')) };
+  return { accessToken, scope: String(result?.scope || '') };
 }
 
 export async function openExternalServiceLink(url) {
