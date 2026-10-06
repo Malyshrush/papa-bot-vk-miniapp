@@ -258,6 +258,19 @@ button {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-entry-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-entry-actions .help-button {
+  min-width: 130px;
+  min-height: 44px;
+  padding: 0 12px;
 }
 
 .theme-toggle {
@@ -596,6 +609,15 @@ button {
   background: var(--surface);
   padding: 18px;
   box-shadow: var(--shadow);
+}
+
+.notice-with-action {
+  display: grid;
+  gap: 14px;
+}
+
+.notice > .primary-button {
+  width: min(100%, 360px);
 }
 
 .inline-error {

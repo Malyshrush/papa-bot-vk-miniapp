@@ -15,6 +15,7 @@ const NOTICE_DURATION_MS = 5000;
 const EMPTY_STATE = {
   loading: true,
   error: '',
+  errorCode: '',
   communityId: '',
   slug: '',
   groups: [],
@@ -196,12 +197,19 @@ function GroupImage({ src, alt, type }) {
   return <img className={`group-${type}`} src={src} alt={alt} loading="lazy" />;
 }
 
-function StatusView({ title, text }) {
+function StatusView({ title, text, onOpenCabinet, cabinetBusy, cabinetNotice }) {
   return (
     <main className="app-shell app-shell-center">
-      <section className="notice">
+      <section className={`notice${onOpenCabinet ? ' notice-with-action' : ''}`}>
         <h1>{title}</h1>
         <p>{text}</p>
+        {onOpenCabinet ? <>
+          <p>Войдите или зарегистрируйтесь в личном кабинете, затем откройте «НАСТРОЙКА» и добавьте своё сообщество.</p>
+          <button className="primary-button" type="button" disabled={cabinetBusy} onClick={onOpenCabinet}>
+            {cabinetBusy ? 'Открываем кабинет...' : 'Открыть личный кабинет PAPA BOT'}
+          </button>
+          {cabinetNotice ? <p role="alert">{cabinetNotice}</p> : null}
+        </> : null}
       </section>
     </main>
   );
@@ -406,6 +414,9 @@ export default function App() {
   const [installNotice, setInstallNotice] = useState('');
   const [connectNotice, setConnectNotice] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !hasCompletedOnboarding());
+  const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
+  const needsCabinet = (state.errorCode === 'community_not_connected' && state.admin)
+    || (state.errorCode === 'community_not_found' && canManageCommunity);
 
   const loadCurrentRoute = useCallback(async () => {
     const route = parseRouteHash();
@@ -423,7 +434,7 @@ export default function App() {
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', communityId, slug: route.slug, intro, admin: route.admin, connectUserToken: false, handoff: '', handoffTicket: '' }));
+    setState((prev) => ({ ...prev, loading: true, error: '', errorCode: '', communityId, slug: route.slug, intro, admin: route.admin, connectUserToken: false, handoff: '', handoffTicket: '' }));
     try {
       if (route.admin) {
         const data = await loadAdminGroups(communityId, launchParams);
@@ -439,7 +450,7 @@ export default function App() {
         setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, intro });
       }
     } catch (error) {
-      setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed, intro }));
+      setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed, errorCode: error.code || '', intro }));
     }
   }, [launchParams]);
 
@@ -466,7 +477,7 @@ export default function App() {
   }, [theme, themeStorageKey]);
 
   useEffect(() => {
-    if (!state.error || state.handoff) return undefined;
+    if (!state.error || state.handoff || needsCabinet) return undefined;
     const currentNotice = state.error;
     const noticeTimeoutId = window.setTimeout(() => {
       setState((currentState) => currentState.error === currentNotice
@@ -474,12 +485,11 @@ export default function App() {
         : currentState);
     }, NOTICE_DURATION_MS);
     return () => window.clearTimeout(noticeTimeoutId);
-  }, [state.error, state.handoff]);
+  }, [state.error, state.handoff, needsCabinet]);
 
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);
   const openAdmin = () => { window.location.hash = new URLSearchParams({ c: state.communityId, admin: '1' }).toString(); };
-  const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const completeOnboarding = () => {
     rememberCompletedOnboarding();
     setShowOnboarding(false);
@@ -539,6 +549,20 @@ export default function App() {
     } finally {
       completingHandoff.current = false;
       setBusy(false);
+    }
+  };
+
+  const openCabinetRegistration = async () => {
+    setCabinetBusy(true);
+    setInstallNotice('');
+    try {
+      if (!await openExternalServiceLink(PAPA_BOT_SERVICE_URL)) {
+        throw new Error('Не удалось открыть личный кабинет PAPA BOT. Повторите попытку.');
+      }
+    } catch (error) {
+      setInstallNotice(error?.message || 'Не удалось открыть личный кабинет PAPA BOT.');
+    } finally {
+      setCabinetBusy(false);
     }
   };
 
@@ -614,7 +638,7 @@ export default function App() {
       const data = await createAdminGroup(state.communityId, group, launchParams);
       setAdminGroups((current) => [...current, data.group]);
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error.message || COPY.loadFailed }));
+      setState((prev) => ({ ...prev, error: error.message || COPY.loadFailed, errorCode: error.code || '' }));
     } finally {
       setBusy(false);
     }
@@ -633,6 +657,9 @@ export default function App() {
   }
 
   if (state.error && !state.group && state.groups.length === 0) {
+    if (needsCabinet) {
+      return <StatusView title="Подключите сообщество" text={state.error} onOpenCabinet={openCabinetRegistration} cabinetBusy={cabinetBusy} cabinetNotice={installNotice} />;
+    }
     if (state.intro) {
       return (
         <main className="app-shell">
@@ -665,8 +692,9 @@ export default function App() {
           {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
           <header className="list-header">
             <h1>{COPY.groupsTitle}</h1>
-            <div className="view-actions">{canManageCommunity ? <button className="help-button" type="button" onClick={openAdmin}>Настроить</button> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
+            <div className="view-actions">{canManageCommunity ? <div className="admin-entry-actions"><button className="help-button" type="button" onClick={openAdmin}>Настроить</button><button className="help-button" type="button" disabled={cabinetBusy} onClick={openCabinetRegistration}>{cabinetBusy ? 'Открываем...' : 'Личный кабинет'}</button></div> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
           </header>
+          {installNotice ? <div className="inline-error" role="alert">{installNotice}</div> : null}
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {state.groups.length ? (
             <GroupList groups={state.groups} onOpen={openGroup} />
