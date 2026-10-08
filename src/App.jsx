@@ -197,12 +197,13 @@ function GroupImage({ src, alt, type }) {
   return <img className={`group-${type}`} src={src} alt={alt} loading="lazy" />;
 }
 
-function StatusView({ title, text, onOpenCabinet, cabinetBusy, cabinetNotice }) {
+function StatusView({ title, text, onOpenCabinet, onRetry, cabinetBusy, cabinetNotice }) {
   return (
     <main className="app-shell app-shell-center">
-      <section className={`notice${onOpenCabinet ? ' notice-with-action' : ''}`}>
+      <section className={`notice${onOpenCabinet || onRetry ? ' notice-with-action' : ''}`}>
         <h1>{title}</h1>
         <p>{text}</p>
+        {onRetry ? <button className="primary-button" type="button" onClick={onRetry}>Повторить загрузку</button> : null}
         {onOpenCabinet ? <>
           <p>Войдите или зарегистрируйтесь в личном кабинете, затем откройте «НАСТРОЙКА» и добавьте своё сообщество.</p>
           <button className="primary-button" type="button" disabled={cabinetBusy} onClick={onOpenCabinet}>
@@ -503,6 +504,7 @@ export default function App() {
 
   useEffect(() => {
     if (!state.error || state.handoff || needsCabinet) return undefined;
+    if (!state.group && state.groups.length === 0) return undefined;
     const currentNotice = state.error;
     const noticeTimeoutId = window.setTimeout(() => {
       setState((currentState) => currentState.error === currentNotice
@@ -703,11 +705,12 @@ export default function App() {
         <main className="app-shell">
               <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
           <div className="inline-error">{state.error}</div>
+          <button className="primary-button" type="button" onClick={() => loadCurrentRoute()}>Повторить загрузку</button>
           <LegalFooter />
         </main>
       );
     }
-    return <StatusView title="Mini App" text={state.error} />;
+    return <StatusView title="Mini App" text={state.error} onRetry={() => loadCurrentRoute()} />;
   }
 
   return (
