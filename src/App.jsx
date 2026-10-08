@@ -71,7 +71,7 @@ const ONBOARDING_STEPS = [
     eyebrow: 'Шаг 3 из 3',
     title: 'Вы управляете подписками',
     text: 'Подключённые направления отмечены в списке. В любой момент откройте карточку и нажмите «Отписаться».',
-    points: ['Статус виден прямо в приложении', 'Вернуться к обучению можно по кнопке «Как это работает»']
+    points: ['Статус виден прямо в приложении', 'Вернуться к обучению можно через меню «Главная страница»']
   }
 ];
 
@@ -245,22 +245,21 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-function HeaderActions({ onShowOnboarding, theme, onToggleTheme }) {
+function HeaderActions({ theme, onToggleTheme }) {
   return (
     <div className="view-actions">
-      <button className="help-button" type="button" onClick={onShowOnboarding}>Как это работает</button>
       <ThemeToggle theme={theme} onToggle={onToggleTheme} />
     </div>
   );
 }
 
-function ServiceIntro({ onShowOnboarding, theme, onToggleTheme, installBusy, installNotice, cabinetBusy, onAddToCommunity, onOpenService }) {
+function ServiceIntro({ theme, onToggleTheme, installBusy, installNotice, cabinetBusy, onAddToCommunity, onOpenService }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
         <div className="intro-heading">
           <span className="intro-badge">VK Mini App</span>
-          <HeaderActions onShowOnboarding={onShowOnboarding} theme={theme} onToggleTheme={onToggleTheme} />
+          <HeaderActions theme={theme} onToggleTheme={onToggleTheme} />
         </div>
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
@@ -417,7 +416,7 @@ function DisplaySettings({ groups, value, busy, onSave }) {
   );
 }
 
-function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabinet }) {
+function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabinet, onShowOnboarding }) {
   const [open, setOpen] = useState(false);
   const choose = (action) => { setOpen(false); action(); };
   return <div className="app-menu-wrap">
@@ -425,6 +424,7 @@ function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabi
     {open ? <div className="app-menu-backdrop" onClick={() => setOpen(false)}><nav className="app-menu" aria-label="Разделы приложения" onClick={event => event.stopPropagation()}>
       <button type="button" onClick={() => choose(onHome)}>⌂ <span>Главная страница</span></button>
       <button type="button" onClick={() => choose(onSubscriptions)}>✓ <span>Мои подписки</span></button>
+      <button type="button" onClick={() => choose(onShowOnboarding)}>ⓘ <span>Как это работает</span></button>
       {canManage ? <button type="button" onClick={() => choose(onSettings)}>⚙ <span>Настройки</span></button> : null}
       {canManage ? <button type="button" onClick={() => choose(onCabinet)}>↗ <span>Личный кабинет</span></button> : null}
     </nav></div> : null}
@@ -773,7 +773,8 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-              <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
+          <AppMenu title="Главная страница" canManage={false} onHome={openHome} onSubscriptions={openSubscriptions} onShowOnboarding={() => setShowOnboarding(true)} />
+          <ServiceIntro theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
           <div className="inline-error">{state.error}</div>
           <button className="primary-button" type="button" onClick={() => loadCurrentRoute()}>Повторить загрузку</button>
           <LegalFooter />
@@ -785,14 +786,15 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      {!state.intro ? <AppMenu
+      <AppMenu
         title={state.admin ? 'Настройки' : section === 'subscriptions' ? 'Мои подписки' : state.group ? state.group.title : 'Главная страница'}
         canManage={canManageCommunity}
         onHome={openHome}
         onSubscriptions={openSubscriptions}
         onSettings={openAdmin}
         onCabinet={openCabinetRegistration}
-      /> : null}
+        onShowOnboarding={() => setShowOnboarding(true)}
+      />
       {state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
@@ -801,17 +803,17 @@ export default function App() {
       ) : state.group ? (
         <>
           <div className="detail-toolbar">
-            <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
+            <HeaderActions theme={theme} onToggleTheme={toggleTheme} />
           </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
           <GroupDetail group={state.group} busy={busy} busyDots={busyDots} onBack={backToList} onToggle={toggleSubscription} redirectLink={redirectLink} />
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
+          {state.intro ? <ServiceIntro theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
           <header className="list-header">
             <h1>{section === 'subscriptions' ? 'Мои подписки' : COPY.groupsTitle}</h1>
-            <div className="view-actions">{canManageCommunity ? <div className="admin-entry-actions"><button className="help-button" type="button" onClick={openAdmin}>Настроить</button><button className="help-button" type="button" disabled={cabinetBusy} onClick={openCabinetRegistration}>{cabinetBusy ? 'Открываем...' : 'Личный кабинет'}</button></div> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
+            <div className="view-actions">{canManageCommunity ? <div className="admin-entry-actions"><button className="help-button" type="button" onClick={openAdmin}>Настроить</button><button className="help-button" type="button" disabled={cabinetBusy} onClick={openCabinetRegistration}>{cabinetBusy ? 'Открываем...' : 'Личный кабинет'}</button></div> : null}{!state.intro ? <HeaderActions theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
           </header>
           {installNotice ? <div className="inline-error" role="alert">{installNotice}</div> : null}
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}

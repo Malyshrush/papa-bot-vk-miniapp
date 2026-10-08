@@ -841,3 +841,11 @@ button {
   .vk-login-shell { width:100%; padding:0; }
   .vk-login-card { min-height:calc(100vh - 44px); border:0; border-radius:0; padding:24px 18px; }
 }
+
+/* A resizable VK iframe must derive its height from content, not from its own viewport. */
+:root.vk-resizable-frame .onboarding-shell,
+:root.vk-resizable-frame .vk-login-shell { min-height:0; }
+@media (max-width:520px) {
+  :root.vk-resizable-frame .onboarding-card,
+  :root.vk-resizable-frame .vk-login-card { min-height:0; }
+}

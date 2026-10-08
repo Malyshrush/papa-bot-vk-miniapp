@@ -159,7 +159,7 @@ export function installDesktopAutoResize() {
 
   const measure = () => ({
     width: Math.max(320, Math.ceil(document.documentElement.clientWidth)),
-    height: Math.max(400, Math.ceil(document.body.scrollHeight + 16))
+    height: Math.max(400, Math.ceil(document.body.scrollHeight))
   });
   const schedule = () => {
     if (disposed || frame) return;
