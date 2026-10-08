@@ -258,15 +258,6 @@ button {
   place-items: center;
 }
 
-.list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 4px 2px 14px;
-}
-
 .theme-toggle {
   position: relative;
   width: 70px;
@@ -314,7 +305,6 @@ button {
   transform: translateX(34px);
 }
 
-.list-header h1,
 .notice h1,
 .detail h1,
 .intro h1 {
@@ -750,10 +740,6 @@ button {
     height: 52px;
   }
 
-  .list-header {
-    align-items: flex-start;
-  }
-
   .help-button {
     white-space: normal;
   }
@@ -764,7 +750,7 @@ button {
 }
 
 .admin-workspace { display:grid; gap:16px; padding:8px 0; }
-.app-menu-wrap { position:relative; z-index:20; display:flex; justify-content:center; margin:0 0 20px; }
+.app-menu-wrap { position:relative; z-index:20; display:flex; justify-content:center; margin:0 0 12px; }
 .app-menu-toggle { width:min(320px,100%); min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:10px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-weight:800; cursor:pointer; box-shadow:0 8px 20px rgba(38,136,235,.22); }
 .app-menu-toggle:hover,.app-menu-toggle:focus-visible { filter:brightness(1.08); }
 .app-menu-chevron { width:26px; height:26px; flex:none; fill:none; stroke:currentColor; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s ease; }

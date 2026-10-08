@@ -47,7 +47,6 @@ const COPY = {
   openInVkForSubscribe: '\u0414\u043b\u044f \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u0439 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438 \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 Mini App \u0432\u043d\u0443\u0442\u0440\u0438 VK: \u0442\u0430\u043a VK \u043f\u0435\u0440\u0435\u0434\u0430\u0451\u0442 \u043f\u043e\u0434\u043f\u0438\u0441\u0430\u043d\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f.',
   loading: '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430',
   loadingGroups: '\u041f\u043e\u043b\u0443\u0447\u0430\u0435\u043c \u0433\u0440\u0443\u043f\u043f\u044b \u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0430',
-  groupsTitle: 'Подписные сообщества',
   noGroups: '\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0445 \u0433\u0440\u0443\u043f\u043f \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.'
 };
 
@@ -802,9 +801,6 @@ export default function App() {
       ) : (
         <>
           {state.intro ? <ServiceIntro installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
-          <header className="list-header">
-            <h1>{section === 'subscriptions' ? 'Мои подписки' : COPY.groupsTitle}</h1>
-          </header>
           {installNotice ? <div className="inline-error" role="alert">{installNotice}</div> : null}
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {section === 'home' && state.display?.mode === 'single' && state.featuredGroup ? (
