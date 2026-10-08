@@ -245,21 +245,12 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-function HeaderActions({ theme, onToggleTheme }) {
-  return (
-    <div className="view-actions">
-      <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-    </div>
-  );
-}
-
-function ServiceIntro({ theme, onToggleTheme, installBusy, installNotice, cabinetBusy, onAddToCommunity, onOpenService }) {
+function ServiceIntro({ installBusy, installNotice, cabinetBusy, onAddToCommunity, onOpenService }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
         <div className="intro-heading">
           <span className="intro-badge">VK Mini App</span>
-          <HeaderActions theme={theme} onToggleTheme={onToggleTheme} />
         </div>
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
@@ -416,11 +407,12 @@ function DisplaySettings({ groups, value, busy, onSave }) {
   );
 }
 
-function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabinet, onShowOnboarding }) {
+function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabinet, onShowOnboarding, theme, onToggleTheme }) {
   const [open, setOpen] = useState(false);
   const choose = (action) => { setOpen(false); action(); };
   return <div className="app-menu-wrap">
-    <button className="app-menu-toggle" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{title} <span aria-hidden="true">⌄</span></button>
+    <button className="app-menu-toggle" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{title} <svg className="app-menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 7 7 7-7" /></svg></button>
+    <div className="app-theme-toggle"><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div>
     {open ? <div className="app-menu-backdrop" onClick={() => setOpen(false)}><nav className="app-menu" aria-label="Разделы приложения" onClick={event => event.stopPropagation()}>
       <button type="button" onClick={() => choose(onHome)}>⌂ <span>Главная страница</span></button>
       <button type="button" onClick={() => choose(onSubscriptions)}>✓ <span>Мои подписки</span></button>
@@ -773,8 +765,8 @@ export default function App() {
     if (state.intro) {
       return (
         <main className="app-shell">
-          <AppMenu title="Главная страница" canManage={false} onHome={openHome} onSubscriptions={openSubscriptions} onShowOnboarding={() => setShowOnboarding(true)} />
-          <ServiceIntro theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
+          <AppMenu title="Главная страница" canManage={false} onHome={openHome} onSubscriptions={openSubscriptions} onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
+          <ServiceIntro installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
           <div className="inline-error">{state.error}</div>
           <button className="primary-button" type="button" onClick={() => loadCurrentRoute()}>Повторить загрузку</button>
           <LegalFooter />
@@ -794,6 +786,8 @@ export default function App() {
         onSettings={openAdmin}
         onCabinet={openCabinetRegistration}
         onShowOnboarding={() => setShowOnboarding(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       {state.admin ? (
         <>
@@ -802,18 +796,14 @@ export default function App() {
         </>
       ) : state.group ? (
         <>
-          <div className="detail-toolbar">
-            <HeaderActions theme={theme} onToggleTheme={toggleTheme} />
-          </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
           <GroupDetail group={state.group} busy={busy} busyDots={busyDots} onBack={backToList} onToggle={toggleSubscription} redirectLink={redirectLink} />
         </>
       ) : (
         <>
-          {state.intro ? <ServiceIntro theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
+          {state.intro ? <ServiceIntro installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
           <header className="list-header">
             <h1>{section === 'subscriptions' ? 'Мои подписки' : COPY.groupsTitle}</h1>
-            <div className="view-actions">{canManageCommunity ? <div className="admin-entry-actions"><button className="help-button" type="button" onClick={openAdmin}>Настроить</button><button className="help-button" type="button" disabled={cabinetBusy} onClick={openCabinetRegistration}>{cabinetBusy ? 'Открываем...' : 'Личный кабинет'}</button></div> : null}{!state.intro ? <HeaderActions theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
           </header>
           {installNotice ? <div className="inline-error" role="alert">{installNotice}</div> : null}
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
