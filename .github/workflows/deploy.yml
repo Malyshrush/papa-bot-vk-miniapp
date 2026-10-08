@@ -5,6 +5,17 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      version_ref:
+        description: Saved Mini App tag to deploy (empty means main)
+        required: false
+        type: string
+      request_id:
+        description: Unique Control Center deployment request
+        required: false
+        type: string
+
+run-name: Mini App ${{ inputs.request_id || github.sha }}
 
 permissions:
   contents: read
@@ -24,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version_ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,6 +53,9 @@ jobs:
           VITE_PAPA_BOT_API_URL: ${{ vars.PAPA_BOT_PUBLIC_URL }}
           VITE_DEFAULT_COMMUNITY_ID: ${{ vars.DEFAULT_COMMUNITY_ID }}
           VITE_BASE_PATH: /papa-bot-vk-miniapp/
+
+      - name: Record source revision
+        run: node -e "require('fs').writeFileSync('dist/release.json', JSON.stringify({sha:require('child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()}))"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

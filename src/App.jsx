@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
 import { flushSync } from 'react-dom';
-import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
+import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
@@ -20,6 +20,8 @@ const EMPTY_STATE = {
   slug: '',
   groups: [],
   group: null,
+  featuredGroup: null,
+  display: { mode: 'list-icons', featuredSlug: '' },
   intro: false,
   admin: false,
   connectUserToken: false,
@@ -346,12 +348,12 @@ function waitForNextPaint() {
   });
 }
 
-function GroupList({ groups, onOpen }) {
+function GroupList({ groups, onOpen, mode = 'list-icons' }) {
   return (
-    <div className="group-list">
+    <div className={`group-list group-list--${mode}`}>
       {groups.map((group) => (
         <button className="group-card" type="button" key={group.slug} onClick={() => onOpen(group.slug)}>
-          <GroupImage src={group.iconUrl} alt={group.title} type="icon" />
+          {mode !== 'list' ? <GroupImage src={group.iconUrl} alt={group.title} type="icon" /> : null}
           <span className="group-card-copy">
             <strong>{group.title}</strong>
             {group.description ? <span>{group.description}</span> : null}
@@ -363,13 +365,13 @@ function GroupList({ groups, onOpen }) {
   );
 }
 
-function GroupDetail({ group, busy, busyDots, onBack, onToggle, redirectLink }) {
+function GroupDetail({ group, busy, busyDots, onBack, onToggle, redirectLink, featured = false }) {
   const buttonText = group.subscribed ? group.unsubscribeText : group.subscribeText;
   const buttonColor = normalizeButtonColor(group.subscribed ? group.unsubscribeColor : group.subscribeColor);
   const buttonStyle = { backgroundColor: buttonColor, color: getReadableButtonTextColor(buttonColor) };
   return (
     <article className="detail">
-      <button className="back-button" type="button" onClick={onBack}>{COPY.back}</button>
+      {!featured ? <button className="back-button" type="button" onClick={onBack}>{COPY.back}</button> : null}
       <GroupImage src={group.bannerUrl} alt={group.title} type="banner" />
       <div className="detail-copy">
         <h1>{group.title}</h1>
@@ -390,7 +392,46 @@ function GroupDetail({ group, busy, busyDots, onBack, onToggle, redirectLink }) 
   );
 }
 
-function AdminWorkspace({ groups, busy, onBack, onCreate }) {
+function DisplaySettings({ groups, value, busy, onSave }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value.mode, value.featuredSlug]);
+  const visibleGroups = groups.filter(group => group.enabled && !group.hidden);
+  return (
+    <form className="display-settings" onSubmit={(event) => { event.preventDefault(); onSave(draft); }}>
+      <h2>Вид главной страницы</h2>
+      <p>Выберите, как подписные группы выглядят у посетителей сообщества.</p>
+      <div className="display-options" role="radiogroup" aria-label="Вид главной страницы">
+        {[
+          ['list', 'Список'], ['list-icons', 'Список с иконками'],
+          ['tiles', 'Плитка'], ['single', 'Определённая подписная страница']
+        ].map(([mode, label]) => <label key={mode}><input type="radio" name="miniapp-display" checked={draft.mode === mode} onChange={() => setDraft(current => ({ ...current, mode }))} />{label}</label>)}
+      </div>
+      {draft.mode === 'single' ? <label className="display-featured-label">Выберите группу подписчиков
+        <select value={draft.featuredSlug} required onChange={(event) => setDraft(current => ({ ...current, featuredSlug: event.target.value }))}>
+          <option value="">Выберите группу</option>
+          {visibleGroups.map(group => <option key={group.slug} value={group.slug}>{group.title}</option>)}
+        </select>
+      </label> : null}
+      <button className="primary-button" type="submit" disabled={busy}>{busy ? COPY.saving : 'Сохранить вид'}</button>
+    </form>
+  );
+}
+
+function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabinet }) {
+  const [open, setOpen] = useState(false);
+  const choose = (action) => { setOpen(false); action(); };
+  return <div className="app-menu-wrap">
+    <button className="app-menu-toggle" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{title} <span aria-hidden="true">⌄</span></button>
+    {open ? <div className="app-menu-backdrop" onClick={() => setOpen(false)}><nav className="app-menu" aria-label="Разделы приложения" onClick={event => event.stopPropagation()}>
+      <button type="button" onClick={() => choose(onHome)}>⌂ <span>Главная страница</span></button>
+      <button type="button" onClick={() => choose(onSubscriptions)}>✓ <span>Мои подписки</span></button>
+      {canManage ? <button type="button" onClick={() => choose(onSettings)}>⚙ <span>Настройки</span></button> : null}
+      {canManage ? <button type="button" onClick={() => choose(onCabinet)}>↗ <span>Личный кабинет</span></button> : null}
+    </nav></div> : null}
+  </div>;
+}
+
+function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const submit = async (event) => {
@@ -406,6 +447,7 @@ function AdminWorkspace({ groups, busy, onBack, onCreate }) {
       <p className="admin-workspace-kicker">PAPA BOT · Администратору</p>
       <h1 id="admin-workspace-title">Направления подписок</h1>
       <p>Добавьте направление — оно сразу появится у пользователей этого сообщества.</p>
+      <DisplaySettings groups={groups} value={display} busy={busy} onSave={onSaveDisplay} />
       <form className="admin-group-form" onSubmit={submit}>
         <label>Название<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength="80" placeholder="Например, Новости" required /></label>
         <label>Описание<textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength="500" placeholder="Что получит подписчик" /></label>
@@ -426,6 +468,8 @@ export default function App() {
   const [theme, setTheme] = useState(() => getInitialTheme(themeStorageKey));
   const [state, setState] = useState(EMPTY_STATE);
   const [adminGroups, setAdminGroups] = useState([]);
+  const [adminDisplay, setAdminDisplay] = useState({ mode: 'list-icons', featuredSlug: '' });
+  const [section, setSection] = useState('home');
   const [busy, setBusy] = useState(false);
   const [busyDots, setBusyDots] = useState(1);
   const redirectGeneration = useRef(0);
@@ -464,6 +508,7 @@ export default function App() {
       if (route.admin) {
         const data = await loadAdminGroups(communityId, launchParams);
         setAdminGroups(data.groups || []);
+        setAdminDisplay(data.display || { mode: 'list-icons', featuredSlug: '' });
         setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, admin: true });
       } else if (route.slug) {
         const data = await loadGroup(communityId, route.slug, launchParams);
@@ -472,7 +517,7 @@ export default function App() {
         setState({ loading: false, error: '', communityId, slug: route.slug, groups: [], group, intro: false });
       } else {
         const data = await loadGroups(communityId, launchParams);
-        setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, intro });
+        setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, featuredGroup: data.featuredGroup || null, display: data.display || { mode: 'list-icons', featuredSlug: '' }, intro });
       }
     } catch (error) {
       setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed, errorCode: error.code || '', intro }));
@@ -525,6 +570,8 @@ export default function App() {
 
   const openGroup = (slug) => setGroupHash(state.communityId, slug);
   const backToList = () => setGroupHash(state.communityId);
+  const openHome = () => { setSection('home'); backToList(); };
+  const openSubscriptions = () => { setSection('subscriptions'); backToList(); };
   const openAdmin = () => { window.location.hash = new URLSearchParams({ c: state.communityId, admin: '1' }).toString(); };
   const completeOnboarding = () => {
     rememberCompletedOnboarding();
@@ -638,7 +685,8 @@ export default function App() {
   };
 
   const toggleSubscription = async () => {
-    if (!state.group || !state.communityId) return;
+    const activeGroup = state.group || state.featuredGroup;
+    if (!activeGroup || !state.communityId) return;
     const generation = ++redirectGeneration.current;
     setRedirectLink(null);
     setBusy(true);
@@ -646,13 +694,13 @@ export default function App() {
       if (!launchParams.sign || !launchParams.vk_user_id) {
         throw new Error(COPY.openInVkForSubscribe);
       }
-      if (!state.group.subscribed) {
-        const data = await subscribeGroup(state.communityId, state.group.slug, launchParams);
-        const updatedGroup = data.group || { ...state.group, subscribed: true };
+      if (!activeGroup.subscribed) {
+        const data = await subscribeGroup(state.communityId, activeGroup.slug, launchParams);
+        const updatedGroup = data.group || { ...activeGroup, subscribed: true };
         flushSync(() => {
-          setState((prev) => ({ ...prev, group: updatedGroup }));
+          setState((prev) => ({ ...prev, [prev.group ? 'group' : 'featuredGroup']: updatedGroup, groups: prev.groups.map(group => group.slug === activeGroup.slug ? { ...group, subscribed: true } : group) }));
         });
-        rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, true);
+        rememberSubscription(launchParams.vk_user_id, state.communityId, activeGroup.slug, true);
         try {
           await allowMessagesFromGroup(state.communityId);
         } catch {
@@ -660,18 +708,18 @@ export default function App() {
         }
         await navigateAfterAction(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId, generation);
       } else {
-        const data = await unsubscribeGroup(state.communityId, state.group.slug, launchParams);
-        const updatedGroup = data.group || { ...state.group, subscribed: false };
+        const data = await unsubscribeGroup(state.communityId, activeGroup.slug, launchParams);
+        const updatedGroup = data.group || { ...activeGroup, subscribed: false };
         flushSync(() => {
-          setState((prev) => ({ ...prev, group: updatedGroup }));
+          setState((prev) => ({ ...prev, [prev.group ? 'group' : 'featuredGroup']: updatedGroup, groups: prev.groups.map(group => group.slug === activeGroup.slug ? { ...group, subscribed: false } : group) }));
         });
-        rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, false);
+        rememberSubscription(launchParams.vk_user_id, state.communityId, activeGroup.slug, false);
         await navigateAfterAction(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId, generation);
       }
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: state.group.subscribed
+        error: activeGroup.subscribed
           ? (error.message || COPY.unsubscribeFailed)
           : (error.message || COPY.allowMessages)
       }));
@@ -688,6 +736,19 @@ export default function App() {
       setAdminGroups((current) => [...current, data.group]);
     } catch (error) {
       setState((prev) => ({ ...prev, error: error.message || COPY.loadFailed, errorCode: error.code || '' }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateAdminDisplay = async (display) => {
+    setBusy(true);
+    try {
+      const data = await saveAdminDisplay(state.communityId, display, launchParams);
+      setAdminDisplay(data.display);
+      setState(prev => ({ ...prev, error: '' }));
+    } catch (error) {
+      setState(prev => ({ ...prev, error: error.message || 'Не удалось сохранить вид главной страницы.' }));
     } finally {
       setBusy(false);
     }
@@ -724,10 +785,18 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      {!state.intro ? <AppMenu
+        title={state.admin ? 'Настройки' : section === 'subscriptions' ? 'Мои подписки' : state.group ? state.group.title : 'Главная страница'}
+        canManage={canManageCommunity}
+        onHome={openHome}
+        onSubscriptions={openSubscriptions}
+        onSettings={openAdmin}
+        onCabinet={openCabinetRegistration}
+      /> : null}
       {state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <AdminWorkspace groups={adminGroups} busy={busy} onBack={backToList} onCreate={addAdminGroup} />
+          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={backToList} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
         </>
       ) : state.group ? (
         <>
@@ -741,15 +810,17 @@ export default function App() {
         <>
           {state.intro ? <ServiceIntro onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} installBusy={installBusy} installNotice={installNotice} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} /> : null}
           <header className="list-header">
-            <h1>{COPY.groupsTitle}</h1>
+            <h1>{section === 'subscriptions' ? 'Мои подписки' : COPY.groupsTitle}</h1>
             <div className="view-actions">{canManageCommunity ? <div className="admin-entry-actions"><button className="help-button" type="button" onClick={openAdmin}>Настроить</button><button className="help-button" type="button" disabled={cabinetBusy} onClick={openCabinetRegistration}>{cabinetBusy ? 'Открываем...' : 'Личный кабинет'}</button></div> : null}{!state.intro ? <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} /> : null}</div>
           </header>
           {installNotice ? <div className="inline-error" role="alert">{installNotice}</div> : null}
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
-          {state.groups.length ? (
-            <GroupList groups={state.groups} onOpen={openGroup} />
+          {section === 'home' && state.display?.mode === 'single' && state.featuredGroup ? (
+            <GroupDetail group={state.featuredGroup} featured busy={busy} busyDots={busyDots} onToggle={toggleSubscription} redirectLink={redirectLink} />
+          ) : (section === 'subscriptions' ? state.groups.filter(group => group.subscribed) : state.groups).length ? (
+            <GroupList groups={section === 'subscriptions' ? state.groups.filter(group => group.subscribed) : state.groups} mode={section === 'subscriptions' ? 'list-icons' : state.display?.mode || 'list-icons'} onOpen={openGroup} />
           ) : (
-            <EmptyGroups onShowOnboarding={() => setShowOnboarding(true)} />
+            section === 'subscriptions' ? <p className="empty-subscriptions">Пока нет подписок. Откройте главную страницу и выберите интересную группу.</p> : <EmptyGroups onShowOnboarding={() => setShowOnboarding(true)} />
           )}
         </>
       )}

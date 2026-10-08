@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "versions": [
+    {
+      "version": 1,
+      "name": "Версия 1",
+      "createdAt": "2026-10-08T16:27:58.000Z",
+      "tag": "papa-bot-miniapp-v1",
+      "sha": "dbe20eddd11f79a21d47ccac7d97007d186d64e0",
+      "description": "Исходный VK Mini App до выбора вида главной страницы"
+    }
+  ]
+}

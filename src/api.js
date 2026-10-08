@@ -126,6 +126,14 @@ export function createAdminGroup(communityId, group, launchParams) {
   });
 }
 
+export function saveAdminDisplay(communityId, display, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'admin-display', c: communityId }), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, display })
+  });
+}
+
 export function completeVkHandoff(ticket, payload, launchParams) {
   return requestJson(buildUrl({ miniapp: 'complete-handoff' }), {
     method: 'POST',
