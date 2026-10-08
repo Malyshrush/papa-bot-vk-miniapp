@@ -24,6 +24,14 @@
       "tag": "papa-bot-miniapp-v3",
       "sha": "a08fa168ea0de27f0202684106e42b1f3c9e649f",
       "description": "Автоматическая высота настольного VK Mini App и голубая кнопка меню"
+    },
+    {
+      "version": 4,
+      "name": "Версия 4",
+      "createdAt": "2026-10-08T18:39:04.000Z",
+      "tag": "papa-bot-miniapp-v4",
+      "sha": "0cfd8dde2f5da2415b677b99d447f0340a6039e2",
+      "description": "Стабильное открытие инструкции и пункт «Как это работает» в верхнем меню"
     }
   ]
 }
