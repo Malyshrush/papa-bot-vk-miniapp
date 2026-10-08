@@ -72,13 +72,42 @@ export function buildMiniAppRedirectUrl(mode, customUrl, communityId) {
   }
 }
 
-export function openMiniAppRedirect(mode, customUrl, communityId) {
+export function prepareMiniAppRedirect(mode, customUrl, communityId) {
+  const redirectUrl = buildMiniAppRedirectUrl(mode, customUrl, communityId);
+  if (!redirectUrl) return null;
+  let popup = null;
+  try {
+    // Reserve the window while the original click still has browser user activation.
+    popup = window.open('about:blank', '_blank');
+  } catch (error) {
+    popup = null;
+  }
+  if (popup) {
+    try { popup.opener = null; } catch (error) { cancelMiniAppRedirect({ popup }); popup = null; }
+    try { if (popup?.document?.body) popup.document.body.textContent = 'PAPA BOT: завершаем действие...'; } catch (error) {}
+  }
+  return { popup };
+}
+
+export function cancelMiniAppRedirect(prepared) {
+  try { prepared?.popup?.close(); } catch (error) {}
+}
+
+export function openMiniAppRedirect(mode, customUrl, communityId, prepared) {
   const redirectUrl = buildMiniAppRedirectUrl(mode, customUrl, communityId);
   if (!redirectUrl) {
-    return false;
+    cancelMiniAppRedirect(prepared);
+    return { url: '', opened: false };
   }
-  window.open(redirectUrl, '_blank', 'noopener,noreferrer');
-  return true;
+  try {
+    if (prepared?.popup && !prepared.popup.closed) {
+      prepared.popup.location.replace(redirectUrl);
+      return { url: redirectUrl, opened: true };
+    }
+  } catch (error) {}
+  cancelMiniAppRedirect(prepared);
+  // VK WebViews may block popups. The caller renders a direct-click link instead.
+  return { url: redirectUrl, opened: false };
 }
 
 export async function initVkBridge() {

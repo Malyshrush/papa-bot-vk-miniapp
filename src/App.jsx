@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { addMiniAppToCommunity, allowMessagesFromGroup, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, cancelMiniAppRedirect, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, prepareMiniAppRedirect, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
 const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
@@ -353,7 +353,7 @@ function GroupList({ groups, onOpen }) {
   );
 }
 
-function GroupDetail({ group, busy, onBack, onToggle }) {
+function GroupDetail({ group, busy, onBack, onToggle, redirectLink }) {
   const buttonText = group.subscribed ? group.unsubscribeText : group.subscribeText;
   const buttonColor = normalizeButtonColor(group.subscribed ? group.unsubscribeColor : group.subscribeColor);
   const buttonStyle = { backgroundColor: buttonColor, color: getReadableButtonTextColor(buttonColor) };
@@ -368,6 +368,14 @@ function GroupDetail({ group, busy, onBack, onToggle }) {
       <button className="primary-button subscription-button" type="button" style={buttonStyle} disabled={busy} onClick={onToggle}>
         {busy ? COPY.saving : buttonText}
       </button>
+      {redirectLink ? (
+        <div className="post-action-redirect" role="status">
+          <span>Если переход не открылся автоматически, нажмите:</span>
+          <a className="secondary-button post-action-redirect-link" href={redirectLink.url} target="_blank" rel="noopener noreferrer">
+            {redirectLink.mode === 'community' ? 'Открыть сообщество' : redirectLink.mode === 'messages' ? 'Открыть сообщения' : 'Открыть ссылку'}
+          </a>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -413,12 +421,14 @@ export default function App() {
   const [cabinetBusy, setCabinetBusy] = useState(false);
   const [installNotice, setInstallNotice] = useState('');
   const [connectNotice, setConnectNotice] = useState('');
+  const [redirectLink, setRedirectLink] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !hasCompletedOnboarding());
   const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const needsCabinet = (state.errorCode === 'community_not_connected' && state.admin)
     || (state.errorCode === 'community_not_found' && canManageCommunity);
 
-  const loadCurrentRoute = useCallback(async () => {
+  const loadCurrentRoute = useCallback(async (preserveRedirect = false) => {
+    if (!preserveRedirect) setRedirectLink(null);
     const route = parseRouteHash();
     const handoffCommunityId = route.communityId || launchParams.vk_group_id || '';
     const communityId = route.communityId || launchParams.vk_group_id || DEFAULT_COMMUNITY_ID;
@@ -456,14 +466,15 @@ export default function App() {
 
   useEffect(() => {
     loadCurrentRoute();
-    window.addEventListener('hashchange', loadCurrentRoute);
-    return () => window.removeEventListener('hashchange', loadCurrentRoute);
+    const loadChangedRoute = () => loadCurrentRoute();
+    window.addEventListener('hashchange', loadChangedRoute);
+    return () => window.removeEventListener('hashchange', loadChangedRoute);
   }, [loadCurrentRoute]);
 
   useEffect(() => {
     const refreshAfterExternalNavigation = () => {
       if (document.visibilityState === 'visible') {
-        loadCurrentRoute();
+        loadCurrentRoute(true);
       }
     };
     document.addEventListener('visibilitychange', refreshAfterExternalNavigation);
@@ -588,11 +599,18 @@ export default function App() {
 
   const toggleSubscription = async () => {
     if (!state.group || !state.communityId) return;
+    let preparedRedirect = null;
+    setRedirectLink(null);
     setBusy(true);
     try {
       if (!launchParams.sign || !launchParams.vk_user_id) {
         throw new Error(COPY.openInVkForSubscribe);
       }
+      preparedRedirect = prepareMiniAppRedirect(
+        state.group.subscribed ? state.group.unsubscribeRedirectMode : state.group.subscribeRedirectMode,
+        state.group.subscribed ? state.group.unsubscribeRedirectUrl : state.group.subscribeRedirectUrl,
+        state.communityId
+      );
       if (!state.group.subscribed) {
         const data = await subscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: true };
@@ -607,7 +625,9 @@ export default function App() {
         } catch {
           // Subscription is already saved. VK message permission is optional and must not roll it back.
         }
-        openMiniAppRedirect(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId);
+        const navigation = openMiniAppRedirect(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId, preparedRedirect);
+        preparedRedirect = null;
+        setRedirectLink(navigation.url ? { url: navigation.url, mode: updatedGroup.subscribeRedirectMode } : null);
       } else {
         const data = await unsubscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: false };
@@ -617,9 +637,12 @@ export default function App() {
         });
         rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, false);
         await waitForNextPaint();
-        openMiniAppRedirect(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId);
+        const navigation = openMiniAppRedirect(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId, preparedRedirect);
+        preparedRedirect = null;
+        setRedirectLink(navigation.url ? { url: navigation.url, mode: updatedGroup.unsubscribeRedirectMode } : null);
       }
     } catch (error) {
+      cancelMiniAppRedirect(preparedRedirect);
       setState((prev) => ({
         ...prev,
         error: state.group.subscribed
@@ -685,7 +708,7 @@ export default function App() {
             <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
           </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <GroupDetail group={state.group} busy={busy} onBack={backToList} onToggle={toggleSubscription} />
+          <GroupDetail group={state.group} busy={busy} onBack={backToList} onToggle={toggleSubscription} redirectLink={redirectLink} />
         </>
       ) : (
         <>
