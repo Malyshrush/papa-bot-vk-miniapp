@@ -16,6 +16,14 @@
       "tag": "papa-bot-miniapp-v2",
       "sha": "5b586dc35566fb90ff79fca33d9577c39a14bbbe",
       "description": "Четыре вида главной страницы, меню и подписки"
+    },
+    {
+      "version": 3,
+      "name": "Версия 3",
+      "createdAt": "2026-10-08T18:15:57.000Z",
+      "tag": "papa-bot-miniapp-v3",
+      "sha": "a08fa168ea0de27f0202684106e42b1f3c9e649f",
+      "description": "Автоматическая высота настольного VK Mini App и голубая кнопка меню"
     }
   ]
 }
