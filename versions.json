@@ -40,6 +40,14 @@
       "tag": "papa-bot-miniapp-v5",
       "sha": "4bcc874d5412b18d267327a06ee93a6e2fc5a9c8",
       "description": "Переключатель темы справа вверху и верхнее меню без повторных кнопок"
+    },
+    {
+      "version": 6,
+      "name": "Версия 6",
+      "createdAt": "2026-10-08T19:11:19.000Z",
+      "tag": "papa-bot-miniapp-v6",
+      "sha": "9645ffc0726d67d99f02bffa0fada960cb822de5",
+      "description": "Карточки подписок сразу под меню без повторного заголовка"
     }
   ]
 }
