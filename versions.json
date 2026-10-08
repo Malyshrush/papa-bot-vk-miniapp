@@ -8,6 +8,14 @@
       "tag": "papa-bot-miniapp-v1",
       "sha": "dbe20eddd11f79a21d47ccac7d97007d186d64e0",
       "description": "Исходный VK Mini App до выбора вида главной страницы"
+    },
+    {
+      "version": 2,
+      "name": "Версия 2",
+      "createdAt": "2026-10-08T16:44:18.000Z",
+      "tag": "papa-bot-miniapp-v2",
+      "sha": "5b586dc35566fb90ff79fca33d9577c39a14bbbe",
+      "description": "Четыре вида главной страницы, меню и подписки"
     }
   ]
 }
