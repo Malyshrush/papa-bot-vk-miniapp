@@ -72,42 +72,20 @@ export function buildMiniAppRedirectUrl(mode, customUrl, communityId) {
   }
 }
 
-export function prepareMiniAppRedirect(mode, customUrl, communityId) {
+export function navigateMiniAppRedirect(mode, customUrl, communityId) {
   const redirectUrl = buildMiniAppRedirectUrl(mode, customUrl, communityId);
-  if (!redirectUrl) return null;
-  let popup = null;
+  if (!redirectUrl) return { url: '', attempted: false };
   try {
-    // Reserve the window while the original click still has browser user activation.
-    popup = window.open('about:blank', '_blank');
-  } catch (error) {
-    popup = null;
-  }
-  if (popup) {
-    try { popup.opener = null; } catch (error) { cancelMiniAppRedirect({ popup }); popup = null; }
-    try { if (popup?.document?.body) popup.document.body.textContent = 'PAPA BOT: завершаем действие...'; } catch (error) {}
-  }
-  return { popup };
-}
-
-export function cancelMiniAppRedirect(prepared) {
-  try { prepared?.popup?.close(); } catch (error) {}
-}
-
-export function openMiniAppRedirect(mode, customUrl, communityId, prepared) {
-  const redirectUrl = buildMiniAppRedirectUrl(mode, customUrl, communityId);
-  if (!redirectUrl) {
-    cancelMiniAppRedirect(prepared);
-    return { url: '', opened: false };
-  }
-  try {
-    if (prepared?.popup && !prepared.popup.closed) {
-      prepared.popup.location.replace(redirectUrl);
-      return { url: redirectUrl, opened: true };
+    if (window.top !== window) {
+      window.top.location.href = redirectUrl;
+    } else {
+      window.location.assign(redirectUrl);
     }
+    return { url: redirectUrl, attempted: true };
   } catch (error) {}
-  cancelMiniAppRedirect(prepared);
-  // VK WebViews may block popups. The caller renders a direct-click link instead.
-  return { url: redirectUrl, opened: false };
+  // A sandboxed VK frame can reject automatic top-level navigation.
+  // The caller then offers a direct user-click link targeting the top frame.
+  return { url: redirectUrl, attempted: false };
 }
 
 export async function initVkBridge() {

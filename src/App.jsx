@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, subscribeGroup, unsubscribeGroup } from './api.js';
-import { addMiniAppToCommunity, allowMessagesFromGroup, cancelMiniAppRedirect, openExternalServiceLink, openMiniAppRedirect, parseLaunchParams, parseRouteHash, prepareMiniAppRedirect, requestPapaBotUserToken, setGroupHash } from './vk.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
 const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
@@ -353,7 +353,7 @@ function GroupList({ groups, onOpen }) {
   );
 }
 
-function GroupDetail({ group, busy, onBack, onToggle, redirectLink }) {
+function GroupDetail({ group, busy, busyDots, onBack, onToggle, redirectLink }) {
   const buttonText = group.subscribed ? group.unsubscribeText : group.subscribeText;
   const buttonColor = normalizeButtonColor(group.subscribed ? group.unsubscribeColor : group.subscribeColor);
   const buttonStyle = { backgroundColor: buttonColor, color: getReadableButtonTextColor(buttonColor) };
@@ -365,13 +365,13 @@ function GroupDetail({ group, busy, onBack, onToggle, redirectLink }) {
         <h1>{group.title}</h1>
         {group.description ? <p>{group.description}</p> : null}
       </div>
-      <button className="primary-button subscription-button" type="button" style={buttonStyle} disabled={busy} onClick={onToggle}>
-        {busy ? COPY.saving : buttonText}
+      <button className="primary-button subscription-button" type="button" style={buttonStyle} disabled={busy} aria-busy={busy} onClick={onToggle}>
+        {busy ? `В процессе${'.'.repeat(busyDots)}` : buttonText}
       </button>
       {redirectLink ? (
         <div className="post-action-redirect" role="status">
-          <span>Если переход не открылся автоматически, нажмите:</span>
-          <a className="secondary-button post-action-redirect-link" href={redirectLink.url} target="_blank" rel="noopener noreferrer">
+          <span>Переход не открылся автоматически. Нажмите:</span>
+          <a className="secondary-button post-action-redirect-link" href={redirectLink.url} target="_top" rel="noopener noreferrer">
             {redirectLink.mode === 'community' ? 'Открыть сообщество' : redirectLink.mode === 'messages' ? 'Открыть сообщения' : 'Открыть ссылку'}
           </a>
         </div>
@@ -417,6 +417,8 @@ export default function App() {
   const [state, setState] = useState(EMPTY_STATE);
   const [adminGroups, setAdminGroups] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [busyDots, setBusyDots] = useState(1);
+  const redirectGeneration = useRef(0);
   const [installBusy, setInstallBusy] = useState(false);
   const [cabinetBusy, setCabinetBusy] = useState(false);
   const [installNotice, setInstallNotice] = useState('');
@@ -428,7 +430,10 @@ export default function App() {
     || (state.errorCode === 'community_not_found' && canManageCommunity);
 
   const loadCurrentRoute = useCallback(async (preserveRedirect = false) => {
-    if (!preserveRedirect) setRedirectLink(null);
+    if (!preserveRedirect) {
+      redirectGeneration.current += 1;
+      setRedirectLink(null);
+    }
     const route = parseRouteHash();
     const handoffCommunityId = route.communityId || launchParams.vk_group_id || '';
     const communityId = route.communityId || launchParams.vk_group_id || DEFAULT_COMMUNITY_ID;
@@ -470,6 +475,15 @@ export default function App() {
     window.addEventListener('hashchange', loadChangedRoute);
     return () => window.removeEventListener('hashchange', loadChangedRoute);
   }, [loadCurrentRoute]);
+
+  useEffect(() => {
+    if (!busy) {
+      setBusyDots(1);
+      return undefined;
+    }
+    const timer = window.setInterval(() => setBusyDots(value => value === 5 ? 1 : value + 1), 350);
+    return () => window.clearInterval(timer);
+  }, [busy]);
 
   useEffect(() => {
     const refreshAfterExternalNavigation = () => {
@@ -597,52 +611,53 @@ export default function App() {
     }
   };
 
+  const navigateAfterAction = async (mode, url, communityId, generation) => {
+    flushSync(() => setBusy(false));
+    await waitForNextPaint();
+    const currentHref = window.location.href;
+    const navigation = navigateMiniAppRedirect(mode, url, communityId);
+    if (!navigation.url) return;
+    const fallback = () => {
+      if (redirectGeneration.current === generation && window.location.href === currentHref && document.visibilityState === 'visible') {
+        setRedirectLink({ url: navigation.url, mode });
+      }
+    };
+    if (navigation.attempted) window.setTimeout(fallback, 1500);
+    else fallback();
+  };
+
   const toggleSubscription = async () => {
     if (!state.group || !state.communityId) return;
-    let preparedRedirect = null;
+    const generation = ++redirectGeneration.current;
     setRedirectLink(null);
     setBusy(true);
     try {
       if (!launchParams.sign || !launchParams.vk_user_id) {
         throw new Error(COPY.openInVkForSubscribe);
       }
-      preparedRedirect = prepareMiniAppRedirect(
-        state.group.subscribed ? state.group.unsubscribeRedirectMode : state.group.subscribeRedirectMode,
-        state.group.subscribed ? state.group.unsubscribeRedirectUrl : state.group.subscribeRedirectUrl,
-        state.communityId
-      );
       if (!state.group.subscribed) {
         const data = await subscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: true };
         flushSync(() => {
           setState((prev) => ({ ...prev, group: updatedGroup }));
-          setBusy(false);
         });
         rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, true);
-        await waitForNextPaint();
         try {
           await allowMessagesFromGroup(state.communityId);
         } catch {
           // Subscription is already saved. VK message permission is optional and must not roll it back.
         }
-        const navigation = openMiniAppRedirect(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId, preparedRedirect);
-        preparedRedirect = null;
-        setRedirectLink(navigation.url ? { url: navigation.url, mode: updatedGroup.subscribeRedirectMode } : null);
+        await navigateAfterAction(updatedGroup.subscribeRedirectMode, updatedGroup.subscribeRedirectUrl, state.communityId, generation);
       } else {
         const data = await unsubscribeGroup(state.communityId, state.group.slug, launchParams);
         const updatedGroup = data.group || { ...state.group, subscribed: false };
         flushSync(() => {
           setState((prev) => ({ ...prev, group: updatedGroup }));
-          setBusy(false);
         });
         rememberSubscription(launchParams.vk_user_id, state.communityId, state.group.slug, false);
-        await waitForNextPaint();
-        const navigation = openMiniAppRedirect(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId, preparedRedirect);
-        preparedRedirect = null;
-        setRedirectLink(navigation.url ? { url: navigation.url, mode: updatedGroup.unsubscribeRedirectMode } : null);
+        await navigateAfterAction(updatedGroup.unsubscribeRedirectMode, updatedGroup.unsubscribeRedirectUrl, state.communityId, generation);
       }
     } catch (error) {
-      cancelMiniAppRedirect(preparedRedirect);
       setState((prev) => ({
         ...prev,
         error: state.group.subscribed
@@ -708,7 +723,7 @@ export default function App() {
             <HeaderActions onShowOnboarding={() => setShowOnboarding(true)} theme={theme} onToggleTheme={toggleTheme} />
           </div>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <GroupDetail group={state.group} busy={busy} onBack={backToList} onToggle={toggleSubscription} redirectLink={redirectLink} />
+          <GroupDetail group={state.group} busy={busy} busyDots={busyDots} onBack={backToList} onToggle={toggleSubscription} redirectLink={redirectLink} />
         </>
       ) : (
         <>
