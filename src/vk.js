@@ -144,6 +144,59 @@ export async function requestPapaBotUserToken() {
   return { accessToken, scope: String(result?.scope || '') };
 }
 
+// VK desktop embeds Mini Apps in an iframe. Ask VK to grow that iframe with the
+// content instead of leaving an inner vertical scrollbar at its initial height.
+export function installDesktopAutoResize() {
+  if (window.parent === window || !document.body || typeof ResizeObserver === 'undefined') return () => {};
+  document.documentElement.classList.add('vk-resizable-frame');
+  let disposed = false;
+  let frame = 0;
+  let retryTimer = 0;
+  let lastSize = '';
+  let pending = false;
+  let queued = false;
+  let failures = 0;
+
+  const measure = () => ({
+    width: Math.max(320, Math.ceil(document.documentElement.clientWidth)),
+    height: Math.max(400, Math.ceil(document.body.scrollHeight + 16))
+  });
+  const schedule = () => {
+    if (disposed || frame) return;
+    frame = window.requestAnimationFrame(async () => {
+      frame = 0;
+      if (pending) { queued = true; return; }
+      const size = measure();
+      const key = `${size.width}:${size.height}`;
+      if (key === lastSize) return;
+      pending = true;
+      lastSize = key;
+      try {
+        await sendBridgeWithTimeout('VKWebAppResizeWindow', size, 'VK не изменил размер окна Mini App.', 2500);
+        failures = 0;
+      } catch {
+        lastSize = '';
+        if (++failures < 3) retryTimer = window.setTimeout(schedule, 1000);
+      } finally {
+        pending = false;
+        if (queued) { queued = false; schedule(); }
+      }
+    });
+  };
+  const observer = new ResizeObserver(schedule);
+  observer.observe(document.body);
+  window.addEventListener('resize', schedule);
+  schedule();
+  return () => {
+    disposed = true;
+    observer.disconnect();
+    window.removeEventListener('resize', schedule);
+    if (frame) window.cancelAnimationFrame(frame);
+    if (retryTimer) window.clearTimeout(retryTimer);
+    document.documentElement.classList.remove('vk-resizable-frame');
+  };
+}
+
 export async function openExternalServiceLink(url) {
   let serviceUrl;
   try {

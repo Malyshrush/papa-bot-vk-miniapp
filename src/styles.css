@@ -239,6 +239,20 @@ button {
   padding: 18px 14px 28px;
 }
 
+.vk-resizable-frame,
+.vk-resizable-frame body,
+.vk-resizable-frame .app-shell {
+  min-height: 0;
+}
+
+.vk-resizable-frame {
+  scrollbar-width: none;
+}
+
+.vk-resizable-frame::-webkit-scrollbar {
+  display: none;
+}
+
 .app-shell-center {
   display: grid;
   place-items: center;
@@ -780,11 +794,13 @@ button {
 }
 
 .admin-workspace { display:grid; gap:16px; padding:8px 0; }
-.app-menu-wrap { position:relative; z-index:20; margin:-18px -14px 18px; }
-.app-menu-toggle { width:100%; min-height:46px; border:0; border-bottom:1px solid var(--border); background:var(--surface); color:var(--text-primary); font-weight:800; cursor:pointer; }
-.app-menu-toggle span { margin-left:8px; color:var(--accent); }
-.app-menu-backdrop { position:fixed; inset:46px 0 0; z-index:30; background:rgba(0,0,0,.44); }
-.app-menu { position:absolute; top:4px; left:max(8px,calc((100vw - 744px)/2)); right:max(8px,calc((100vw - 744px)/2)); display:grid; gap:2px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 16px 35px rgba(0,0,0,.25); }
+.app-menu-wrap { position:relative; z-index:20; display:flex; justify-content:center; margin:0 0 20px; }
+.app-menu-toggle { width:min(320px,100%); min-height:48px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-weight:800; cursor:pointer; box-shadow:0 8px 20px rgba(38,136,235,.22); }
+.app-menu-toggle:hover,.app-menu-toggle:focus-visible { filter:brightness(1.08); }
+.app-menu-toggle span { margin-left:8px; color:inherit; }
+:root[data-theme="dark"] .app-menu-toggle { color:#10203a; }
+.app-menu-backdrop { position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.44); }
+.app-menu { position:absolute; top:74px; left:max(8px,calc((100vw - 744px)/2)); right:max(8px,calc((100vw - 744px)/2)); display:grid; gap:2px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:0 16px 35px rgba(0,0,0,.25); }
 .app-menu button { display:flex; align-items:center; gap:14px; width:100%; min-height:44px; padding:8px 12px; border:0; border-radius:8px; background:transparent; color:var(--text-primary); text-align:left; cursor:pointer; }
 .app-menu button:hover,.app-menu button:focus-visible { background:var(--surface-soft); }
 .app-menu button span { flex:1; }
