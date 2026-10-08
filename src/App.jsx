@@ -216,6 +216,15 @@ function StatusView({ title, text, onOpenCabinet, onRetry, cabinetBusy, cabinetN
   );
 }
 
+function LoadingTitle() {
+  const [loadingDots, setLoadingDots] = useState(1);
+  useEffect(() => {
+    const timer = window.setInterval(() => setLoadingDots(value => value === 5 ? 1 : value + 1), 350);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <span aria-label={COPY.loading}>{COPY.loading}<span className="loading-title-dots" aria-hidden="true">{'.'.repeat(loadingDots)}</span></span>;
+}
+
 function ThemeToggle({ theme, onToggle }) {
   const isDark = theme === 'dark';
   return (
@@ -689,7 +698,7 @@ export default function App() {
   }
 
   if (state.loading) {
-    return <StatusView title={COPY.loading} text={COPY.loadingGroups} />;
+    return <StatusView title={<LoadingTitle />} text={COPY.loadingGroups} />;
   }
 
   if (state.handoff && state.handoffTicket) {

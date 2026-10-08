@@ -635,6 +635,12 @@ button {
   gap: 14px;
 }
 
+.loading-title-dots {
+  display: inline-block;
+  width: 1.6em;
+  text-align: left;
+}
+
 .notice > .primary-button {
   width: min(100%, 360px);
 }
