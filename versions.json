@@ -48,6 +48,14 @@
       "tag": "papa-bot-miniapp-v6",
       "sha": "9645ffc0726d67d99f02bffa0fada960cb822de5",
       "description": "Карточки подписок сразу под меню без повторного заголовка"
+    },
+    {
+      "version": 7,
+      "name": "Версия 7",
+      "createdAt": "2026-10-09T06:55:16.000Z",
+      "tag": "papa-bot-miniapp-v7",
+      "sha": "a70cab98f62e5a1f0943a97d8703b97e594b80c3",
+      "description": "Размещение на Selectel с API через vk.papabot.ru и второй копией на GitHub Pages"
     }
   ]
 }
