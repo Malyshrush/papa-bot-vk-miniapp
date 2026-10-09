@@ -8,7 +8,7 @@ const READ_RETRY_DELAY_MS = 500;
 function resolveApiBase() {
   if (API_BASE) return API_BASE;
   if (['localhost', '127.0.0.1'].includes(window.location.hostname)) return window.location.origin;
-  if (window.location.hostname === 'vk.papabot.ru') return `${window.location.origin}/api`;
+  if (['papabott.ru', 'vk.papabot.ru'].includes(window.location.hostname)) return `${window.location.origin}/api`;
   return PAPA_BOT_PRODUCTION_API_URL;
 }
 
