@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
 import { flushSync } from 'react-dom';
-import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
+import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
@@ -195,7 +195,7 @@ function PlaceholderImage({ type }) {
 
 function GroupImage({ src, alt, type }) {
   if (!src) return <PlaceholderImage type={type} />;
-  return <img className={`group-${type}`} src={src} alt={alt} loading="lazy" />;
+  return <img className={`group-${type}`} src={resolveMiniAppImageUrl(src)} alt={alt} loading="lazy" />;
 }
 
 function StatusView({ title, text, onOpenCabinet, onRetry, cabinetBusy, cabinetNotice }) {

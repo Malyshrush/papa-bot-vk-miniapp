@@ -12,6 +12,26 @@ function resolveApiBase() {
   return PAPA_BOT_PRODUCTION_API_URL;
 }
 
+export function resolveMiniAppImageUrl(value) {
+  const original = String(value || '').trim();
+  if (!original) return '';
+  try {
+    const image = new URL(original);
+    const backend = new URL(PAPA_BOT_PRODUCTION_API_URL);
+    const proxy = new URL(resolveApiBase());
+    const allowedKeys = new Set(['miniappAsset', 'assetProfile', 'assetCommunity', 'assetExt']);
+    const keys = [...image.searchParams.keys()];
+    if (proxy.protocol !== 'https:' || proxy.origin !== window.location.origin || proxy.pathname !== '/api'
+      || image.origin !== backend.origin || image.pathname !== backend.pathname || image.hash
+      || !image.searchParams.get('miniappAsset') || keys.length !== new Set(keys).size
+      || keys.some(key => !allowedKeys.has(key))) return original;
+    proxy.search = image.search;
+    return proxy.toString();
+  } catch {
+    return original;
+  }
+}
+
 function buildUrl(params = {}) {
   const url = new URL(resolveApiBase());
   Object.entries(params).forEach(([key, value]) => {
