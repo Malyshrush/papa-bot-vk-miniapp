@@ -2,6 +2,8 @@ import bridge from '@vkontakte/vk-bridge';
 
 const VK_BRIDGE_TIMEOUT_MS = 7000;
 const VK_AUTH_TIMEOUT_MS = 120000;
+const VK_INIT_ATTEMPT_TIMEOUT_MS = 1200;
+const VK_INIT_RETRY_DELAYS_MS = [0, 200, 400, 800];
 export const PAPA_BOT_VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID || 54600849);
 export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 'docs', 'wall', 'market']);
 
@@ -91,16 +93,22 @@ export function navigateMiniAppRedirect(mode, customUrl, communityId) {
 }
 
 export async function initVkBridge() {
-  try {
-    await sendBridgeWithTimeout(
-      'VKWebAppInit',
-      {},
-      '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c VK Mini App'
-    );
-  } catch (error) {
-    return false;
+  for (const delayMs of VK_INIT_RETRY_DELAYS_MS) {
+    if (delayMs) await new Promise(resolve => window.setTimeout(resolve, delayMs));
+    try {
+      await sendBridgeWithTimeout(
+        'VKWebAppInit',
+        {},
+        '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c VK Mini App',
+        VK_INIT_ATTEMPT_TIMEOUT_MS
+      );
+      return true;
+    } catch (error) {
+      // A fast static host can load before VK starts listening to iframe messages.
+      // The next bounded attempt gives the parent frame another chance to respond.
+    }
   }
-  return true;
+  return false;
 }
 
 export async function allowMessagesFromGroup(communityId) {
