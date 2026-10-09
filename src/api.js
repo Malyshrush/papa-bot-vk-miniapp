@@ -7,8 +7,9 @@ const READ_RETRY_DELAY_MS = 500;
 
 function resolveApiBase() {
   if (API_BASE) return API_BASE;
-  if (window.location.hostname === 'malyshrush.github.io') return PAPA_BOT_PRODUCTION_API_URL;
-  return window.location.origin;
+  if (['localhost', '127.0.0.1'].includes(window.location.hostname)) return window.location.origin;
+  if (window.location.hostname === 'vk.papabot.ru') return `${window.location.origin}/api`;
+  return PAPA_BOT_PRODUCTION_API_URL;
 }
 
 function buildUrl(params = {}) {
