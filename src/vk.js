@@ -24,7 +24,9 @@ export function parseLaunchParams() {
 }
 
 export function parseRouteHash() {
-  const raw = window.location.hash.replace(/^#/, '');
+  // VK may relay the app-link fragment as the `hash` launch parameter.
+  const raw = window.location.hash.replace(/^#/, '')
+    || (new URLSearchParams(window.location.search).get('hash') || '').replace(/^#/, '');
   const params = new URLSearchParams(raw);
   const handoff = String(params.get('handoff') || '').trim();
   return {
