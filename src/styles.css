@@ -852,8 +852,8 @@ button {
 .widget-editor-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 .widget-editor-actions > button { flex: 1 1 210px; min-height: 46px; }
 .widget-notice { border: 1px solid var(--success-border); background: var(--success-bg); color: var(--success-text); border-radius: 12px; padding: 12px 14px; }
-.widget-feedback-stack { position: fixed; z-index: 240; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(640px, calc(100vw - 24px)); display: grid; gap: 8px; pointer-events: none; }
-.widget-feedback-stack > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-large); pointer-events: auto; }
+.widget-feedback-stack { width: 100%; display: grid; gap: 8px; margin: 10px 0; }
+.widget-feedback-stack > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-large); }
 .widget-feedback-stack button { flex: 0 0 auto; border: 0; background: transparent; color: inherit; font-size: 21px; line-height: 1; cursor: pointer; }
 .widget-preview-pane { position: sticky; top: 12px; }
 .widget-preview-pane h2 { margin-top: 0; }

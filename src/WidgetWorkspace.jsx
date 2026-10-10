@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { confirmWidget, loadWidgets, previewWidget, saveWidget } from './api.js';
 import { showCommunityWidgetPreview } from './vk.js';
 import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
@@ -50,8 +50,10 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [feedbackLocation, setFeedbackLocation] = useState('top');
   const [pendingImage, setPendingImage] = useState(null);
   const [fullPreview, setFullPreview] = useState(false);
+  const feedbackRef = useRef(null);
 
   useEffect(() => {
     if (!error) return undefined;
@@ -63,6 +65,11 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     const timeout = window.setTimeout(() => setNotice(''), 7000);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+  useEffect(() => {
+    if (!error && !notice) return undefined;
+    const frame = window.requestAnimationFrame(() => feedbackRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [error, notice, feedbackLocation]);
   useEffect(() => {
     if (!fullPreview) return undefined;
     const close = event => { if (event.key === 'Escape') setFullPreview(false); };
@@ -81,17 +88,17 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     let live = true;
     loadWidgets(communityId, launchParams).then(data => {
       if (live) { setCatalogue(data.widgets || []); setActiveId(data.activeId || ''); }
-    }).catch(failure => { if (live) setError(failure.message || 'Не удалось загрузить виджеты.'); });
+    }).catch(failure => { if (live) { setFeedbackLocation('top'); setError(failure.message || 'Не удалось загрузить виджеты.'); } });
     return () => { live = false; };
   }, [communityId, launchParams]);
 
   const change = (key, value) => setDraft(current => ({ ...current, [key]: value }));
   const changeRow = (index, key, value) => setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, [key]: value } : row) }));
   const addRow = () => setDraft(current => ({ ...current, rows: [...current.rows, { ...EMPTY_ROW }] }));
-  const removeRow = (index) => setDraft(current => ({ ...current, rows: current.rows.filter((_, at) => at !== index) }));
+  const removeRow = (index) => { setError(''); setNotice(''); setDraft(current => ({ ...current, rows: current.rows.filter((_, at) => at !== index) })); };
   const uploadImage = async (index, file) => {
     if (!file) return;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setFeedbackLocation(`image:${index}`);
     try {
       const image = await uploadWidgetImage(communityId, draft.type, file, launchParams);
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...image } : row) }));
@@ -100,7 +107,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     finally { setBusy(false); }
   };
   const loadClient = async (index) => {
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setFeedbackLocation(`client:${index}`);
     try {
       const client = await resolveWidgetClient(communityId, draft.rows[index].url, launchParams);
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...client } : row) }));
@@ -118,13 +125,13 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   };
 
   const save = async () => {
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setFeedbackLocation('actions');
     try { await persist(); } catch (failure) { setError(failure.message || 'Не удалось сохранить виджет.'); }
     finally { setBusy(false); }
   };
 
   const publish = async () => {
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setFeedbackLocation('actions');
     try {
       const saved = await persist(false);
       const fresh = await refresh();
@@ -144,15 +151,16 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
 
   const selected = TYPE_BY_ID[draft?.type];
   const limit = draft?.type === 'list' && draft.detailed ? 3 : selected?.[3];
+  const feedbackAt = location => feedbackLocation === location && (error || notice) ? <div className="widget-feedback-stack" ref={feedbackRef} aria-live="polite">
+    {error ? <div className="inline-error" role="alert">{error}<button type="button" aria-label="Закрыть ошибку" onClick={() => setError('')}>×</button></div> : null}
+    {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
+  </div> : null;
   return <section className="widget-workspace" aria-label="Виджеты сообщества">
     <button className="back-button" type="button" onClick={draft ? () => setDraft(null) : onBack}>Назад</button>
     <p className="admin-workspace-kicker">PAPA BOT · Сообщество {communityId}</p>
     <h1>{draft ? draft.name : 'Виджеты сообщества'}</h1>
     <p>Соберите виджет, проверьте его здесь и подтвердите публикацию в окне VK. Один блок сообщества показывает один опубликованный виджет.</p>
-    {error || notice ? <div className="widget-feedback-stack" aria-live="polite">
-      {error ? <div className="inline-error" role="alert">{error}<button type="button" aria-label="Закрыть ошибку" onClick={() => setError('')}>×</button></div> : null}
-      {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
-    </div> : null}
+    {feedbackAt('top')}
     {!draft ? <>
       <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} onClick={() => { setDraft(createDraft(type)); setError(''); setNotice(''); }}>
         <strong>{label}</strong><span>{min}–{max} элементов</span></button>)}</div>
@@ -188,7 +196,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
             <label>Время<input value={row.time} maxLength="100" onChange={event => changeRow(index, 'time', event.target.value)} /></label>
           </div> : null}
           <label>Ссылка элемента<input type="url" value={row.url} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'url', event.target.value)} /></label>
-          {draft.type === 'clients' ? <button type="button" className="widget-secondary" disabled={busy} onClick={() => loadClient(index)}>Загрузить сообщество клиента</button> : null}
+          {draft.type === 'clients' ? <><button type="button" className="widget-secondary" disabled={busy} onClick={() => loadClient(index)}>Загрузить сообщество клиента</button>{feedbackAt(`client:${index}`)}</> : null}
           {groups.length ? <label>Или страница подписки<select value="" onChange={event => {
             const slug = event.target.value;
             if (slug) {
@@ -201,7 +209,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
             <label>Кнопка<input value={row.button} maxLength="40" onChange={event => changeRow(index, 'button', event.target.value)} /></label>
             <label>Ссылка кнопки<input type="url" value={row.buttonUrl} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'buttonUrl', event.target.value)} /></label>
           </div> : null}
-          {draft.showImages && draft.type !== 'clients' ? <div className="widget-image-picker"><label>Изображение для VK
+          {draft.showImages && draft.type !== 'clients' ? <div className="widget-image-picker">{feedbackAt(`image:${index}`)}<label>Изображение для VK
             <input type="file" accept="image/jpeg,image/png" disabled={busy} onChange={event => { if (event.target.files?.[0]) setPendingImage({ index, file: event.target.files[0] }); event.target.value = ''; }} />
           </label>{row.imageUrl ? <img src={row.imageUrl} alt={`Изображение элемента ${index + 1}`} /> : null}
           {row.imageId ? <small>Загружено в VK: {row.imageId}</small> : <small>{draft.type === 'covers' ? 'Рекомендуем 510×128' : draft.type === 'tiles_wide' ? 'Рекомендуем 160×240' : draft.type === 'tiles_square' ? 'Рекомендуем 160×160' : 'Рекомендуем 50×50'} · JPG/PNG до 5 МБ</small>}</div> : null}
@@ -212,6 +220,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <p>Это пример компоновки. Окончательный вид и ссылки проверяются в VK перед публикацией.</p>
         {draft.type.startsWith('tiles_') && draft.rows.length > 3 ? <p>На компьютере VK обычно показывает первые три плитки; остальные доступны в полной карточке.</p> : null}
       </div></div>
+      {feedbackAt('actions')}
       <div className="widget-editor-actions"><button type="button" className="widget-secondary" disabled={busy} onClick={save}>{busy ? 'Подождите…' : 'Сохранить черновик'}</button>
         <button type="button" className="primary-button" disabled={busy} onClick={publish}>Проверить и опубликовать в VK</button></div>
       {pendingImage ? <WidgetImageAdjuster file={pendingImage.file} type={draft.type} onCancel={() => setPendingImage(null)} onApply={file => {
