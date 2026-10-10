@@ -57,7 +57,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
 
   useEffect(() => {
     if (!error) return undefined;
-    const timeout = window.setTimeout(() => setError(''), 12000);
+    const timeout = window.setTimeout(() => setError(''), error.includes('Ответы:') ? 90000 : 12000);
     return () => window.clearTimeout(timeout);
   }, [error]);
   useEffect(() => {
@@ -151,8 +151,12 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
 
   const selected = TYPE_BY_ID[draft?.type];
   const limit = draft?.type === 'list' && draft.detailed ? 3 : selected?.[3];
+  const detailedUploadError = error.includes('Ответы:');
   const feedbackAt = location => feedbackLocation === location && (error || notice) ? <div className="widget-feedback-stack" ref={feedbackRef} aria-live="polite">
-    {error ? <div className="inline-error" role="alert">{error}<button type="button" aria-label="Закрыть ошибку" onClick={() => setError('')}>×</button></div> : null}
+    {error ? <div className="inline-error" role="alert">{detailedUploadError ? <div className="widget-upload-diagnostic">
+      <span>Изображение не сохранено. Нажмите на поле ниже, скопируйте диагностику и пришлите её разработчику.</span>
+      <label>Диагностика загрузки VK<textarea readOnly rows={6} value={error} onFocus={event => event.target.select()} /></label>
+    </div> : error}<button type="button" aria-label="Закрыть ошибку" onClick={() => setError('')}>×</button></div> : null}
     {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
   </div> : null;
   return <section className="widget-workspace" aria-label="Виджеты сообщества">
