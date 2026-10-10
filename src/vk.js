@@ -7,6 +7,15 @@ const VK_INIT_RETRY_DELAYS_MS = [0, 200, 400, 800];
 export const PAPA_BOT_VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID || 54600849);
 export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 'docs', 'wall', 'market']);
 
+export async function showCommunityWidgetPreview(communityId, type, code) {
+  const groupId = Number(communityId);
+  if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error('Выберите сообщество VK.');
+  const result = await sendBridgeWithTimeout('VKWebAppShowCommunityWidgetPreviewBox', {
+    group_id: groupId, type, code
+  }, 'VK не ответил на запрос публикации. Проверьте виджет в сообществе перед повторной попыткой.', 120000);
+  return result?.result === true;
+}
+
 function sendBridgeWithTimeout(method, params, timeoutMessage, timeoutMs = VK_BRIDGE_TIMEOUT_MS) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
@@ -35,6 +44,7 @@ export function parseRouteHash() {
     communityId: params.get('c') || '',
     slug: params.get('g') || '',
     admin: params.get('admin') === '1',
+    widgets: params.get('widgets') === '1',
     handoff,
     handoffTicket: params.get('t') || '',
     connectUserToken: handoff === 'user_token'

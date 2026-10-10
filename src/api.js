@@ -155,6 +155,29 @@ export function saveAdminDisplay(communityId, display, launchParams) {
   });
 }
 
+export function loadWidgets(communityId, launchParams) {
+  return requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'widgets', c: communityId }, launchParams)));
+}
+
+function widgetAction(action, communityId, payload, launchParams) {
+  return requestJson(buildUrl({ miniapp: action, c: communityId }), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, ...payload })
+  });
+}
+
+export function saveWidget(communityId, widget, launchParams) {
+  return widgetAction('widget-save', communityId, { widget }, launchParams);
+}
+
+export function previewWidget(communityId, widgetId, launchParams) {
+  return widgetAction('widget-preview', communityId, { widgetId }, launchParams);
+}
+
+export function confirmWidget(communityId, widgetId, expectedActiveId, launchParams) {
+  return widgetAction('widget-confirm', communityId, { widgetId, expectedActiveId }, launchParams);
+}
+
 export function completeVkHandoff(ticket, payload, launchParams) {
   return requestJson(buildUrl({ miniapp: 'complete-handoff' }), {
     method: 'POST',

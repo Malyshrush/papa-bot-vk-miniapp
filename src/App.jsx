@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
+import WidgetWorkspace from './WidgetWorkspace.jsx';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
@@ -24,6 +25,7 @@ const EMPTY_STATE = {
   display: { mode: 'list-icons', featuredSlug: '' },
   intro: false,
   admin: false,
+  widgets: false,
   connectUserToken: false,
   handoff: '',
   handoffTicket: ''
@@ -406,7 +408,7 @@ function DisplaySettings({ groups, value, busy, onSave }) {
   );
 }
 
-function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabinet, onShowOnboarding, theme, onToggleTheme }) {
+function AppMenu({ title, canManage, canManageWidgets, onHome, onSubscriptions, onSettings, onWidgets, onCabinet, onShowOnboarding, theme, onToggleTheme }) {
   const [open, setOpen] = useState(false);
   const choose = (action) => { setOpen(false); action(); };
   return <div className="app-menu-wrap">
@@ -417,6 +419,7 @@ function AppMenu({ title, canManage, onHome, onSubscriptions, onSettings, onCabi
       <button type="button" onClick={() => choose(onSubscriptions)}>✓ <span>Мои подписки</span></button>
       <button type="button" onClick={() => choose(onShowOnboarding)}>ⓘ <span>Как это работает</span></button>
       {canManage ? <button type="button" onClick={() => choose(onSettings)}>⚙ <span>Настройки</span></button> : null}
+      {canManageWidgets ? <button type="button" onClick={() => choose(onWidgets)}>▦ <span>Виджеты сообщества</span></button> : null}
       {canManage ? <button type="button" onClick={() => choose(onCabinet)}>↗ <span>Личный кабинет</span></button> : null}
     </nav></div> : null}
   </div>;
@@ -471,6 +474,7 @@ export default function App() {
   const [redirectLink, setRedirectLink] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !hasCompletedOnboarding());
   const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
+  const canManageWidgets = ['admin', 'editor', 'creator', 'owner'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const needsCabinet = (state.errorCode === 'community_not_connected' && state.admin)
     || (state.errorCode === 'community_not_found' && canManageCommunity);
 
@@ -494,13 +498,21 @@ export default function App() {
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', errorCode: '', communityId, slug: route.slug, intro, admin: route.admin, connectUserToken: false, handoff: '', handoffTicket: '' }));
+    setState((prev) => ({ ...prev, loading: true, error: '', errorCode: '', communityId, slug: route.slug, intro, admin: route.admin, widgets: route.widgets, connectUserToken: false, handoff: '', handoffTicket: '' }));
     try {
       if (route.admin) {
         const data = await loadAdminGroups(communityId, launchParams);
         setAdminGroups(data.groups || []);
         setAdminDisplay(data.display || { mode: 'list-icons', featuredSlug: '' });
         setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, admin: true });
+      } else if (route.widgets) {
+        if (!['admin', 'editor', 'creator', 'owner'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase())
+          || String(launchParams.vk_group_id || '') !== String(communityId)) {
+          throw new Error('Виджетами может управлять только владелец, администратор или редактор выбранного сообщества VK.');
+        }
+        const data = await loadAdminGroups(communityId, launchParams);
+        setAdminGroups(data.groups || []);
+        setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, widgets: true });
       } else if (route.slug) {
         const data = await loadGroup(communityId, route.slug, launchParams);
         const rememberedSubscribed = readRememberedSubscription(launchParams.vk_user_id, communityId, route.slug);
@@ -564,6 +576,7 @@ export default function App() {
   const openHome = () => { setSection('home'); backToList(); };
   const openSubscriptions = () => { setSection('subscriptions'); backToList(); };
   const openAdmin = () => { window.location.hash = new URLSearchParams({ c: state.communityId, admin: '1' }).toString(); };
+  const openWidgets = () => { window.location.hash = new URLSearchParams({ c: state.communityId, widgets: '1' }).toString(); };
   const completeOnboarding = () => {
     rememberCompletedOnboarding();
     setShowOnboarding(false);
@@ -778,17 +791,21 @@ export default function App() {
   return (
     <main className="app-shell">
       <AppMenu
-        title={state.admin ? 'Настройки' : section === 'subscriptions' ? 'Мои подписки' : state.group ? state.group.title : 'Главная страница'}
+        title={state.widgets ? 'Виджеты' : state.admin ? 'Настройки' : section === 'subscriptions' ? 'Мои подписки' : state.group ? state.group.title : 'Главная страница'}
         canManage={canManageCommunity}
+        canManageWidgets={canManageWidgets}
         onHome={openHome}
         onSubscriptions={openSubscriptions}
         onSettings={openAdmin}
+        onWidgets={openWidgets}
         onCabinet={openCabinetRegistration}
         onShowOnboarding={() => setShowOnboarding(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
-      {state.admin ? (
+      {state.widgets ? (
+        <WidgetWorkspace communityId={state.communityId} launchParams={launchParams} groups={adminGroups} onBack={backToList} />
+      ) : state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
           <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={backToList} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
