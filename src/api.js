@@ -178,6 +178,17 @@ export function confirmWidget(communityId, widgetId, expectedActiveId, launchPar
   return widgetAction('widget-confirm', communityId, { widgetId, expectedActiveId }, launchParams);
 }
 
+export function uploadWidgetImageRequest(communityId, payload, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'widget-image-upload', c: communityId }), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, ...payload })
+  }, 90000);
+}
+
+export function lookupWidgetClientRequest(communityId, payload, launchParams) {
+  return widgetAction('widget-client-lookup', communityId, payload, launchParams);
+}
+
 export function completeVkHandoff(ticket, payload, launchParams) {
   return requestJson(buildUrl({ miniapp: 'complete-handoff' }), {
     method: 'POST',

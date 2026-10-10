@@ -51,6 +51,24 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pendingImage, setPendingImage] = useState(null);
+  const [fullPreview, setFullPreview] = useState(false);
+
+  useEffect(() => {
+    if (!error) return undefined;
+    const timeout = window.setTimeout(() => setError(''), 12000);
+    return () => window.clearTimeout(timeout);
+  }, [error]);
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timeout = window.setTimeout(() => setNotice(''), 7000);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+  useEffect(() => {
+    if (!fullPreview) return undefined;
+    const close = event => { if (event.key === 'Escape') setFullPreview(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [fullPreview]);
 
   const refresh = async () => {
     const data = await loadWidgets(communityId, launchParams);
@@ -73,29 +91,29 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const removeRow = (index) => setDraft(current => ({ ...current, rows: current.rows.filter((_, at) => at !== index) }));
   const uploadImage = async (index, file) => {
     if (!file) return;
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setNotice('');
     try {
-      const image = await uploadWidgetImage(communityId, draft.type, file);
+      const image = await uploadWidgetImage(communityId, draft.type, file, launchParams);
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...image } : row) }));
       setNotice('Изображение загружено в VK. Сохраните черновик.');
     } catch (failure) { setError(failure.message || 'Не удалось загрузить изображение в VK.'); }
     finally { setBusy(false); }
   };
   const loadClient = async (index) => {
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setNotice('');
     try {
-      const client = await resolveWidgetClient(communityId, draft.rows[index].url);
+      const client = await resolveWidgetClient(communityId, draft.rows[index].url, launchParams);
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...client } : row) }));
       setNotice('Сообщество клиента найдено в VK. Сохраните черновик.');
     } catch (failure) { setError(failure.message || 'VK не нашёл клиента.'); }
     finally { setBusy(false); }
   };
 
-  const persist = async () => {
+  const persist = async (notify = true) => {
     const data = await saveWidget(communityId, draft, launchParams);
     setDraft(data.widget);
     await refresh();
-    setNotice('Черновик сохранён. Сообщество пока не изменено.');
+    if (notify) setNotice('Черновик сохранён. Сообщество пока не изменено.');
     return data.widget;
   };
 
@@ -108,7 +126,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const publish = async () => {
     setBusy(true); setError(''); setNotice('');
     try {
-      const saved = await persist();
+      const saved = await persist(false);
       const fresh = await refresh();
       const previous = fresh.widgets?.find(widget => widget.id === fresh.activeId);
       if (previous && previous.id !== saved.id && previous.type !== saved.type &&
@@ -131,8 +149,10 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     <p className="admin-workspace-kicker">PAPA BOT · Сообщество {communityId}</p>
     <h1>{draft ? draft.name : 'Виджеты сообщества'}</h1>
     <p>Соберите виджет, проверьте его здесь и подтвердите публикацию в окне VK. Один блок сообщества показывает один опубликованный виджет.</p>
-    {error ? <div className="inline-error" role="alert">{error}</div> : null}
-    {notice ? <div className="widget-notice" role="status">{notice}</div> : null}
+    {error || notice ? <div className="widget-feedback-stack" aria-live="polite">
+      {error ? <div className="inline-error" role="alert">{error}<button type="button" aria-label="Закрыть ошибку" onClick={() => setError('')}>×</button></div> : null}
+      {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
+    </div> : null}
     {!draft ? <>
       <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} onClick={() => { setDraft(createDraft(type)); setError(''); setNotice(''); }}>
         <strong>{label}</strong><span>{min}–{max} элементов</span></button>)}</div>
@@ -187,7 +207,9 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
           {row.imageId ? <small>Загружено в VK: {row.imageId}</small> : <small>{draft.type === 'covers' ? 'Рекомендуем 510×128' : draft.type === 'tiles_wide' ? 'Рекомендуем 160×240' : draft.type === 'tiles_square' ? 'Рекомендуем 160×160' : 'Рекомендуем 50×50'} · JPG/PNG до 5 МБ</small>}</div> : null}
         </div>)}
         <button type="button" className="widget-secondary" disabled={draft.rows.length >= limit} onClick={addRow}>+ Добавить элемент</button>
-      </div><div className="widget-preview-pane"><h2>Предпросмотр</h2><WidgetVisual widget={draft} /><p>Это пример компоновки. Окончательный вид и ссылки проверяются в VK перед публикацией.</p>
+      </div><div className="widget-preview-pane"><h2>Предпросмотр</h2><WidgetVisual widget={draft} />
+        <button type="button" className="widget-secondary widget-preview-open" onClick={() => setFullPreview(true)}>Открыть полный предпросмотр</button>
+        <p>Это пример компоновки. Окончательный вид и ссылки проверяются в VK перед публикацией.</p>
         {draft.type.startsWith('tiles_') && draft.rows.length > 3 ? <p>На компьютере VK обычно показывает первые три плитки; остальные доступны в полной карточке.</p> : null}
       </div></div>
       <div className="widget-editor-actions"><button type="button" className="widget-secondary" disabled={busy} onClick={save}>{busy ? 'Подождите…' : 'Сохранить черновик'}</button>
@@ -197,6 +219,13 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         setPendingImage(null);
         uploadImage(index, file);
       }} /> : null}
+      {fullPreview ? <div className="widget-full-preview-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setFullPreview(false); }}>
+        <section className="widget-full-preview" role="dialog" aria-modal="true" aria-label="Полный предпросмотр виджета">
+          <div className="widget-full-preview-heading"><h2>Полный предпросмотр</h2><button type="button" className="widget-secondary" onClick={() => setFullPreview(false)}>Закрыть</button></div>
+          <WidgetVisual widget={draft} />
+          <p>Показаны все элементы черновика. Окончательный вид и ссылки подтвердите в системном окне VK.</p>
+        </section>
+      </div> : null}
     </>}
   </section>;
 }
