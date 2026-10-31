@@ -13,7 +13,10 @@ export default function WidgetImageAdjuster({ file, type, onCancel, onApply }) {
   const [flipped, setFlipped] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
-  const [width, height] = SIZES[type] || [50, 50];
+  const [displayWidth, displayHeight] = SIZES[type] || [50, 50];
+  // VK's image_type identifies the displayed size; uploads use triple pixels.
+  const width = displayWidth * 3;
+  const height = displayHeight * 3;
 
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -45,14 +48,30 @@ export default function WidgetImageAdjuster({ file, type, onCancel, onApply }) {
     if (!ready || !canvas.current) return;
     canvas.current.toBlob(blob => {
       if (!blob) { setError('Не удалось подготовить кадр.'); return; }
-      onApply(new File([blob], 'widget-image.png', { type: 'image/png' }));
+      if (blob.size <= 1024 * 1024) {
+        onApply(new File([blob], 'widget-image.png', { type: 'image/png' }));
+        return;
+      }
+      // Large, detailed crops may exceed the server limit as PNG. Flatten onto
+      // white and use JPEG only in that case, preserving the prepared geometry.
+      const jpeg = document.createElement('canvas');
+      jpeg.width = width; jpeg.height = height;
+      const context = jpeg.getContext('2d');
+      context.fillStyle = '#fff'; context.fillRect(0, 0, width, height);
+      context.drawImage(canvas.current, 0, 0);
+      const encode = quality => jpeg.toBlob(result => {
+        if (result && result.size <= 1024 * 1024) onApply(new File([result], 'widget-image.jpg', { type: 'image/jpeg' }));
+        else if (quality > 0.5) encode(quality - 0.2);
+        else setError('Не удалось уменьшить кадр до 1 МБ. Выберите другое изображение.');
+      }, 'image/jpeg', quality);
+      encode(0.9);
     }, 'image/png');
   };
 
   return <div className="widget-image-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onCancel(); }}>
     <section className="widget-image-modal" role="dialog" aria-modal="true" aria-label="Настроить изображение">
       <h2>Настроить изображение</h2>
-      <p>Подгоните кадр под формат VK {width}×{height}. Исходный файл остаётся у вас.</p>
+      <p>Подгоните кадр под формат VK {displayWidth}×{displayHeight}. Для загрузки он будет подготовлен в размере {width}×{height}. Исходный файл остаётся у вас.</p>
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
       <div className="widget-image-canvas-wrap"><canvas ref={canvas} width={width} height={height} aria-label="Предпросмотр кадра" /></div>
       <label>Масштаб<input type="range" min="1" max="3" step="0.05" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
