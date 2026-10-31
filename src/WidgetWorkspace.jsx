@@ -16,6 +16,25 @@ const TYPES = [
 const TYPE_BY_ID = Object.fromEntries(TYPES.map(type => [type[0], type]));
 const EMPTY_ROW = { title: '', description: '', detail: '', address: '', time: '', button: '', url: '', buttonUrl: '', imageId: '', imageUrl: '' };
 
+function publicationDiagnostic(stage, failure, draftSaved) {
+  const data = failure?.error_data && typeof failure.error_data === 'object' ? failure.error_data : {};
+  const numeric = value => Number.isSafeInteger(value) && value >= 0 && value <= 999999 ? String(value) : '';
+  const safeText = value => typeof value === 'string' ? value.slice(0, 400)
+    .replace(/https?:\/\/[^\s<>"']+/gi, '[адрес скрыт]')
+    .replace(/\b(?:access_token|token|secret|password|hash|sign|key|cookie|session|authorization|bearer)\s*(?:[=:]\s*|\s+)[^\s,;]+/gi, '[данные скрыты]')
+    .replace(/[A-Za-z0-9+/_=-]{16,}/g, '[данные скрыты]')
+    .replace(/[\u0000-\u001f\u007f<>]/g, ' ').trim().slice(0, 160) : '';
+  const reason = safeText(data.error_reason || data.error_description || data.error_msg);
+  const type = safeText(failure?.error_type);
+  const vkCode = numeric(data.error_code);
+  const status = numeric(failure?.status);
+  const serverCode = /^[a-z0-9_]{1,48}$/i.test(String(failure?.code || '')) ? String(failure.code) : '';
+  return [`Этап: ${stage}.`, draftSaved ? 'Черновик сохранён.' : 'Сохранение черновика не подтверждено.',
+    type ? `Тип VK: ${type}.` : '', vkCode ? `Код VK: ${vkCode}.` : '', reason ? `Причина VK: ${reason}.` : '',
+    status ? `HTTP: ${status}.` : '', serverCode ? `Код сервера: ${serverCode}.` : '',
+    !type && !vkCode && !reason && !status && !serverCode ? 'Подробности ответа отсутствуют.' : ''].filter(Boolean).join(' ');
+}
+
 function createDraft(type) {
   return { type, name: TYPE_BY_ID[type][1], title: '', titleUrl: '', moreText: '', moreUrl: '',
     visibility: 'all', showImages: true, showButtons: !['reviews', 'clients'].includes(type), detailed: false,
@@ -50,6 +69,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [publicationDetails, setPublicationDetails] = useState('');
   const [feedbackLocation, setFeedbackLocation] = useState('top');
   const [pendingImage, setPendingImage] = useState(null);
   const [fullPreview, setFullPreview] = useState(false);
@@ -65,6 +85,11 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     const timeout = window.setTimeout(() => setNotice(''), 7000);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+  useEffect(() => {
+    if (!publicationDetails) return undefined;
+    const timeout = window.setTimeout(() => setPublicationDetails(''), 90000);
+    return () => window.clearTimeout(timeout);
+  }, [publicationDetails]);
   useEffect(() => {
     if (!error && !notice) return undefined;
     const frame = window.requestAnimationFrame(() => feedbackRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' }));
@@ -98,7 +123,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const removeRow = (index) => { setError(''); setNotice(''); setDraft(current => ({ ...current, rows: current.rows.filter((_, at) => at !== index) })); };
   const uploadImage = async (index, file) => {
     if (!file) return;
-    setBusy(true); setError(''); setNotice(''); setFeedbackLocation(`image:${index}`);
+    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation(`image:${index}`);
     try {
       const image = await uploadWidgetImage(communityId, draft.type, file, launchParams);
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...image } : row) }));
@@ -107,7 +132,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     finally { setBusy(false); }
   };
   const loadClient = async (index) => {
-    setBusy(true); setError(''); setNotice(''); setFeedbackLocation(`client:${index}`);
+    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation(`client:${index}`);
     try {
       const client = await resolveWidgetClient(communityId, draft.rows[index].url, launchParams);
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...client } : row) }));
@@ -125,38 +150,50 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   };
 
   const save = async () => {
-    setBusy(true); setError(''); setNotice(''); setFeedbackLocation('actions');
+    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation('actions');
     try { await persist(); } catch (failure) { setError(failure.message || 'Не удалось сохранить виджет.'); }
     finally { setBusy(false); }
   };
 
   const publish = async () => {
-    setBusy(true); setError(''); setNotice(''); setFeedbackLocation('actions');
+    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation('actions');
+    let stage = 'сохранение черновика';
+    let draftSaved = false;
     try {
       const saved = await persist(false);
+      draftSaved = true;
+      stage = 'проверка текущего виджета';
       const fresh = await refresh();
       const previous = fresh.widgets?.find(widget => widget.id === fresh.activeId);
       if (previous && previous.id !== saved.id && previous.type !== saved.type &&
         !window.confirm('Публикация этого виджета отключит виджет другого типа. Продолжить?')) return;
+      stage = 'проверка и подготовка виджета';
       const compiled = await previewWidget(communityId, saved.id, launchParams);
+      stage = 'системное окно VK';
       const accepted = await showCommunityWidgetPreview(communityId, compiled.type, compiled.code);
       if (!accepted) { setNotice('Публикация отменена в VK. Черновик сохранён.'); return; }
+      stage = 'сохранение результата в PAPA BOT';
       const confirmed = await confirmWidget(communityId, saved.id, fresh.activeId || '', launchParams);
       setActiveId(confirmed.activeId);
       setNotice('Системное окно VK завершилось без ошибки. Проверьте блок в сообществе: это ещё не подтверждение его публикации.');
     } catch (failure) {
-      setError(failure.message || 'VK не подтвердил публикацию. Черновик сохранён.');
+      setError(stage === 'системное окно VK' ? 'VK не подтвердил публикацию.' :
+        failure?.status === 400 && typeof failure?.message === 'string' ? failure.message.slice(0, 200) : 'Не удалось завершить публикацию.');
+      setPublicationDetails(publicationDiagnostic(stage, failure, draftSaved));
     } finally { setBusy(false); }
   };
 
   const selected = TYPE_BY_ID[draft?.type];
   const limit = draft?.type === 'list' && draft.detailed ? 3 : selected?.[3];
   const detailedUploadError = error.includes('Ответы:');
-  const feedbackAt = location => feedbackLocation === location && (error || notice) ? <div className="widget-feedback-stack" ref={feedbackRef} aria-live="polite">
-    {error ? <div className="inline-error" role="alert">{detailedUploadError ? <div className="widget-upload-diagnostic">
+  const feedbackAt = location => feedbackLocation === location && (error || notice || publicationDetails) ? <div className="widget-feedback-stack" ref={feedbackRef} aria-live="polite">
+    {error || publicationDetails ? <div className="inline-error" role="alert">{publicationDetails ? <div className="widget-upload-diagnostic">
+      <span>{error || 'Публикация не подтверждена.'} Скопируйте диагностику и пришлите её разработчику.</span>
+      <label>Диагностика публикации VK<textarea readOnly rows={6} value={publicationDetails} onFocus={event => event.target.select()} /></label>
+    </div> : detailedUploadError ? <div className="widget-upload-diagnostic">
       <span>Изображение не сохранено. Нажмите на поле ниже, скопируйте диагностику и пришлите её разработчику.</span>
       <label>Диагностика загрузки VK<textarea readOnly rows={6} value={error} onFocus={event => event.target.select()} /></label>
-    </div> : error}<button type="button" aria-label="Закрыть ошибку" onClick={() => setError('')}>×</button></div> : null}
+    </div> : error}<button type="button" aria-label="Закрыть ошибку" onClick={() => { setError(''); setPublicationDetails(''); }}>×</button></div> : null}
     {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
   </div> : null;
   return <section className="widget-workspace" aria-label="Виджеты сообщества">

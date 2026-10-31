@@ -13,7 +13,9 @@ export async function showCommunityWidgetPreview(communityId, type, code) {
   const result = await sendBridgeWithTimeout('VKWebAppShowCommunityWidgetPreviewBox', {
     group_id: groupId, type, code
   }, 'VK не ответил на запрос публикации. Проверьте виджет в сообществе перед повторной попыткой.', 120000);
-  return result?.result === true;
+  if (result?.result === true) return true;
+  if (result?.result === false) return false;
+  throw { error_type: 'unexpected_result' };
 }
 
 function sendBridgeWithTimeout(method, params, timeoutMessage, timeoutMs = VK_BRIDGE_TIMEOUT_MS) {
