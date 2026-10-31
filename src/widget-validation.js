@@ -7,6 +7,12 @@ function collectWidgetIssues(widget = {}, publication = true) {
   const tile = ['tiles_wide', 'tiles_square'].includes(widget.type);
   const limits = { tiles_wide: [3, 10], tiles_square: [3, 10], covers: [1, 3], list: [1, widget.detailed ? 3 : 6], compact_list: [1, 6], reviews: [1, 6], clients: [1, 6], text: [0, 0], table: [1, 10], match: [1, 1], matches: [1, 6], donation: [0, 0] }[widget.type];
   if (!limits) { add('type', 'Выберите формат виджета.'); return issues; }
+  const source = widget.dataSource?.provider || 'manual';
+  if (source !== 'manual' && !((widget.type === 'donation' && source === 'donationalerts') || (['match', 'matches'].includes(widget.type) && source === 'api-football'))) add('dataSource.provider', 'Этот источник данных не подходит для выбранного формата.');
+  if (source === 'api-football') {
+    const ids = Array.isArray(widget.dataSource?.fixtureIds) ? widget.dataSource.fixtureIds : [];
+    if (ids.length > (widget.type === 'match' ? 1 : 6) || new Set(ids).size !== ids.length || ids.some(id => !/^[1-9]\d{0,9}$/.test(String(id))) || (publication && !ids.length)) add('dataSource.fixtureIds', 'Укажите ID одного матча или до шести разных ID для списка матчей API-Football.');
+  }
   if (!has(widget.name) && (publication || Object.hasOwn(widget, 'name'))) add('name', 'Укажите название виджета для приложения.');
   if (publication && !has(widget.title)) add('title', 'Добавьте заголовок виджета.');
   if (publication && (rows.length < limits[0] || rows.length > limits[1])) add('rows', widget.type === 'list' && widget.detailed ? 'Подробное описание допускает от одного до трёх элементов.' : `Для этого формата требуется от ${limits[0]} до ${limits[1]} элементов.`);
@@ -73,7 +79,7 @@ function collectWidgetIssues(widget = {}, publication = true) {
       const donation = widget.donation || {};
       length('donation.text', donation.text, 80, 'Цель сбора');
       url('donation.textUrl', donation.textUrl, 'Ссылка цели сбора'); url('donation.buttonUrl', donation.buttonUrl, 'Ссылка кнопки поддержки');
-      if (publication && !has(donation.buttonUrl)) add('donation.buttonUrl', 'Укажите ссылку кнопки поддержки на страницу VK.');
+      if (publication && source !== 'donationalerts' && !has(donation.buttonUrl)) add('donation.buttonUrl', 'Укажите ссылку кнопки поддержки на страницу VK.');
       integer('donation.goal', donation.goal, 1, 99999999, 'Целевая сумма', true);
       integer('donation.funded', donation.funded, 0, 99999999, 'Собранная сумма');
       integer('donation.backers', donation.backers, 0, 99999999, 'Число участников');

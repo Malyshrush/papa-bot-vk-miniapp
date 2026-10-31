@@ -5,6 +5,7 @@ import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
 import WidgetImageAdjuster from './WidgetImageAdjuster.jsx';
 import WidgetTypeThumbnail from './WidgetTypeThumbnail.jsx';
 import WidgetExtraEditor, { EXTRA_TYPES, extraDraft, WidgetExtraVisual } from './WidgetExtraEditor.jsx';
+import WidgetIntegrationPanel from './WidgetIntegrationPanel.jsx';
 import { collectWidgetIssues, widgetValidationError } from './widget-validation.js';
 
 const TYPES = [
@@ -295,6 +296,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <label>Текст нижней ссылки{hint(Boolean(draft.moreUrl), 'заполняется вместе с адресом')}<input value={draft.moreText} maxLength="40" onChange={event => change('moreText', event.target.value)} /></label>
         <label>Адрес нижней ссылки{hint(Boolean(draft.moreText), 'заполняется вместе с текстом')}<input type="url" value={draft.moreUrl} placeholder="https://vk.ru/..." onChange={event => change('moreUrl', event.target.value)} /></label>
         <p className="widget-field-hint">Для черновика можно оставить поля публикации пустыми. Для публикации заполните обязательные поля каждого элемента. Ссылки — полные HTTPS-адреса внутри VK.</p>
+        {['donation', 'match', 'matches'].includes(draft.type) ? <WidgetIntegrationPanel key={`${communityId}:${draft.id || 'new'}:${draft.type}`} draft={draft} savedWidget={catalogue.find(widget => widget.id === draft.id)} communityId={communityId} launchParams={launchParams} activeId={activeId} revision={catalogue} change={change} externalBusy={busy} onImport={(widget, persisted = false) => { setDraft(widget); if (persisted) setCatalogue(current => current.map(item => item.id === widget.id ? widget : item)); }} /> : null}
         {EXTRA_TYPES.has(draft.type) ? <WidgetExtraEditor draft={draft} change={change} changeRow={changeRow} busy={busy} hint={hint} feedbackAt={feedbackAt} onImage={(index, team, file) => setPendingImage({ index, team, file })} /> : <>
         <h2>Элементы <small>{draft.rows.length}/{limit}</small></h2>
         {draft.rows.map((row, index) => <div className="widget-row-editor" key={index}>

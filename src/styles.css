@@ -827,6 +827,22 @@ button {
 .widget-mini-score { fill: var(--text-primary); font: 500 20px Arial, sans-serif; }
 .widget-mini-score-small { fill: var(--text-primary); font: 500 14px Arial, sans-serif; }
 .widget-extra-editor, .widget-team-editor, .widget-match-events { display: grid; gap: 14px; min-width: 0; }
+.widget-integration-panel { display: grid; gap: 12px; min-width: 0; margin: 18px 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
+.widget-integration-panel label { display: grid; gap: 6px; min-width: 0; }
+.widget-integration-panel input, .widget-integration-panel select { min-width: 0; box-sizing: border-box; }
+.widget-integration-panel p { margin: 0; overflow-wrap: anywhere; }
+.widget-integration-panel small { display: block; overflow-wrap: anywhere; }
+.widget-integration-panel .widget-inline-fields { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+@media (max-width: 480px) { .widget-integration-panel .widget-inline-fields { grid-template-columns: minmax(0,1fr); } }
+.widget-integration-actions { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,150px),1fr)); gap: 8px; }
+.widget-integration-actions button { width: 100%; height: 100%; }
+.widget-integration-error { color: var(--error-text); }
+.widget-integration-notice { color: var(--success-text); }
+.widget-fixtures { display: grid; gap: 8px; min-width: 0; }
+.widget-fixtures label { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: center; padding: 8px; background: var(--surface); border-radius: 8px; }
+.widget-fixtures input { width: 18px !important; min-height: 18px !important; }
+.widget-fixtures span { overflow-wrap: anywhere; }
+.widget-donation-page { display: grid; gap: 16px; padding: 20px; background: var(--surface); border-radius: 16px; }
 .widget-extra-editor label { display: grid; gap: 6px; min-width: 0; color: var(--text-secondary); font-size: 13px; font-weight: 600; }
 .widget-extra-editor input, .widget-extra-editor select, .widget-extra-editor textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .widget-extra-editor .widget-inline-fields { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
+import WidgetDonation from './WidgetDonation.jsx';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
@@ -472,7 +473,7 @@ export default function App() {
   const [installNotice, setInstallNotice] = useState('');
   const [connectNotice, setConnectNotice] = useState('');
   const [redirectLink, setRedirectLink] = useState(null);
-  const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !hasCompletedOnboarding());
+  const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !initialRoute.donate && !hasCompletedOnboarding());
   const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const canManageWidgets = ['admin', 'editor', 'creator', 'owner'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const needsCabinet = (state.errorCode === 'community_not_connected' && state.admin)
@@ -495,6 +496,12 @@ export default function App() {
     if (route.handoff && route.handoffTicket) {
       setShowOnboarding(false);
       setState({ ...EMPTY_STATE, loading: false, communityId: handoffCommunityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket, error: !launchParams.sign || !launchParams.vk_user_id ? 'Откройте вход кнопкой «Войти через VK» в кабинете PAPA BOT: для проверки аккаунта нужен запуск внутри VK.' : '' });
+      return;
+    }
+
+    if (route.donate) {
+      setShowOnboarding(false);
+      setState({ ...EMPTY_STATE, loading: false, communityId, donate: route.donate });
       return;
     }
 
@@ -807,7 +814,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
-      {state.widgets ? (
+      {state.donate ? <WidgetDonation communityId={state.communityId} widgetId={state.donate} onBack={backToList} /> : state.widgets ? (
         <WidgetWorkspace communityId={state.communityId} launchParams={launchParams} groups={adminGroups} onBack={backToList} />
       ) : state.admin ? (
         <>

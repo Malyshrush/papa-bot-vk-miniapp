@@ -38,10 +38,10 @@ export default function WidgetExtraEditor({ draft, change, changeRow, busy, hint
     const value = draft.donation || {};
     const update = (field, next) => change('donation', { ...value, [field]: next });
     return <div className="widget-extra-editor">
-      <p className="widget-field-hint">Суммы и число участников задаются вручную. Виджет ведёт на выбранную страницу VK; приём платежей и автоматическое обновление сумм отдельно не подключаются.</p>
+      <p className="widget-field-hint">{draft.dataSource?.provider === 'donationalerts' ? 'После включения DonationAlerts сумма будет обновляться автоматически. Число участников задаётся вручную. Кнопка виджета откроет страницу перехода к DonationAlerts в Mini App.' : 'Суммы и число участников задаются вручную. Для автоматического учёта выберите DonationAlerts выше.'}</p>
       <label>Цель сбора{hint(false, 'до 80 символов')}<input value={value.text || ''} maxLength={80} onChange={event => update('text', event.target.value)} /></label>
       <label>Ссылка цели сбора{hint(false)}<input type="url" value={value.textUrl || ''} placeholder="https://vk.ru/..." onChange={event => update('textUrl', event.target.value)} /></label>
-      <label>Ссылка кнопки поддержки{hint(true, 'страница сбора внутри VK')}<input type="url" value={value.buttonUrl || ''} placeholder="https://vk.ru/..." onChange={event => update('buttonUrl', event.target.value)} /></label>
+      {draft.dataSource?.provider !== 'donationalerts' ? <label>Ссылка кнопки поддержки{hint(true, 'страница сбора внутри VK')}<input type="url" value={value.buttonUrl || ''} placeholder="https://vk.ru/..." onChange={event => update('buttonUrl', event.target.value)} /></label> : null}
       <label>Валюта{hint(true)}<select value={value.currency || 'RUB'} onChange={event => update('currency', event.target.value)}>{['RUB', 'USD', 'EUR', 'UAH', 'BYN', 'KZT', 'MDL', 'AZN', 'GEL', 'AMD', 'ILS', 'GBP', 'TMT', 'BYR', 'KZS'].map(code => <option key={code} value={code}>{code}</option>)}</select></label>
       <label>Целевая сумма{hint(true, 'целое число от 1 до 99 999 999')}<input type="number" min={1} max={99999999} step={1} value={value.goal ?? ''} onChange={event => update('goal', event.target.value)} /></label>
       <div className="widget-inline-fields">
@@ -86,7 +86,7 @@ export default function WidgetExtraEditor({ draft, change, changeRow, busy, hint
 
   return <div className="widget-extra-editor">
     <h2>{draft.type === 'match' ? 'Матч' : `Матчи ${draft.rows.length}/6`}</h2>
-    <p className="widget-field-hint">Названия команд и счёт обязательны для публикации. Счёт и события обновляются вручную. Логотипы необязательны, но указываются для обеих команд.</p>
+    <p className="widget-field-hint">Названия команд и счёт обязательны для публикации. {draft.dataSource?.provider === 'api-football' ? 'Названия, счёт, состояние и доступные голевые события загружаются из API-Football.' : 'Счёт и события обновляются вручную.'} Логотипы необязательны, но указываются для обеих команд.</p>
     {draft.rows.map((row, index) => <div className="widget-row-editor" key={index} role="group" aria-label={`Матч ${index + 1}`}>
       <div className="widget-row-heading"><strong>Матч {index + 1}</strong>{draft.type === 'matches' ? <button type="button" disabled={busy || draft.rows.length <= 1} onClick={() => change('rows', draft.rows.filter((_, at) => at !== index))}>Удалить</button> : null}</div>
       {['teamA', 'teamB'].map((side, at) => <div className="widget-team-editor" key={side}>

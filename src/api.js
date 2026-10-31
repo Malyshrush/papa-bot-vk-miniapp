@@ -193,6 +193,17 @@ export function lookupWidgetClientRequest(communityId, payload, launchParams) {
   return widgetAction('widget-client-lookup', communityId, payload, launchParams);
 }
 
+export function widgetIntegration(communityId, action, payload, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'widget-integration', c: communityId }), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, action, ...payload })
+  }, 60000);
+}
+
+export function loadWidgetDonation(communityId, widgetId) {
+  return requestReadJson(buildUrl({ miniapp: 'widget-donation', c: communityId, widgetId }));
+}
+
 export function completeVkHandoff(ticket, payload, launchParams) {
   return requestJson(buildUrl({ miniapp: 'complete-handoff' }), {
     method: 'POST',

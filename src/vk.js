@@ -5,6 +5,14 @@ const VK_AUTH_TIMEOUT_MS = 120000;
 const VK_INIT_ATTEMPT_TIMEOUT_MS = 1200;
 const VK_INIT_RETRY_DELAYS_MS = [0, 200, 400, 800];
 export const PAPA_BOT_VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID || 54600849);
+
+export async function requestWidgetAutomationToken(communityId) {
+  const groupId = Number(communityId);
+  if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error('Не выбрано сообщество VK.');
+  const result = await sendBridgeWithTimeout('VKWebAppGetCommunityAuthToken', { app_id: PAPA_BOT_VK_APP_ID, group_id: groupId, scope: 'app_widget' }, 'VK не выдал разрешение автообновления. Повторите попытку.', 90000);
+  if (!result?.access_token || String(result.group_id || '') !== String(groupId)) throw new Error('VK не подтвердил разрешение для выбранного сообщества.');
+  return result.access_token;
+}
 export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 'docs', 'wall', 'market']);
 
 export async function showCommunityWidgetPreview(communityId, type, code) {
@@ -55,6 +63,7 @@ export function parseRouteHash() {
     slug: params.get('g') || '',
     admin: params.get('admin') === '1',
     widgets: params.get('widgets') === '1',
+    donate: /^[a-f0-9-]{36}$/.test(params.get('donate') || '') ? params.get('donate') : '',
     handoff,
     handoffTicket: params.get('t') || '',
     connectUserToken: handoff === 'user_token'
