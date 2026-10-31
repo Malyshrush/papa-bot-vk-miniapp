@@ -4,6 +4,7 @@ import { showCommunityWidgetPreview } from './vk.js';
 import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
 import WidgetImageAdjuster from './WidgetImageAdjuster.jsx';
 import WidgetTypeThumbnail from './WidgetTypeThumbnail.jsx';
+import WidgetExtraEditor, { EXTRA_TYPES, extraDraft, WidgetExtraVisual } from './WidgetExtraEditor.jsx';
 import { collectWidgetIssues, widgetValidationError } from './widget-validation.js';
 
 const TYPES = [
@@ -13,7 +14,12 @@ const TYPES = [
   ['list', 'Список', 1, 6],
   ['compact_list', 'Компактный список', 1, 6],
   ['reviews', 'Отзывы', 1, 6],
-  ['clients', 'Наши клиенты', 1, 6]
+  ['clients', 'Наши клиенты', 1, 6],
+  ['text', 'Текст', 0, 0],
+  ['table', 'Таблица', 1, 10],
+  ['match', 'Один матч', 1, 1],
+  ['matches', 'Несколько матчей', 1, 6],
+  ['donation', 'Сбор средств', 0, 0]
 ];
 const TYPE_BY_ID = Object.fromEntries(TYPES.map(type => [type[0], type]));
 const EMPTY_ROW = { title: '', description: '', detail: '', address: '', time: '', button: '', url: '', buttonUrl: '', imageId: '', imageUrl: '' };
@@ -40,7 +46,8 @@ function publicationDiagnostic(stage, failure, draftSaved) {
 function createDraft(type) {
   return { type, name: TYPE_BY_ID[type][1], title: '', titleUrl: '', moreText: '', moreUrl: '',
     visibility: 'all', showImages: true, showButtons: !['reviews', 'clients'].includes(type), detailed: false,
-    rows: Array.from({ length: TYPE_BY_ID[type][2] }, () => ({ ...EMPTY_ROW })) };
+    rows: Array.from({ length: TYPE_BY_ID[type][2] }, () => ({ ...EMPTY_ROW })),
+    ...(EXTRA_TYPES.has(type) ? extraDraft(type) : {}) };
 }
 
 function previewClass(type) {
@@ -51,7 +58,7 @@ function previewClass(type) {
 function WidgetVisual({ widget }) {
   return <div className={`widget-visual ${previewClass(widget.type)}`}>
     <div className="widget-visual-top"><strong>{widget.title || widget.name}</strong><span>{widget.visibility === 'none' ? 'Не показывается' : 'Предпросмотр'}</span></div>
-    <div className="widget-visual-rows">{widget.rows.map((row, index) => <div className="widget-visual-row" key={index}>
+    {EXTRA_TYPES.has(widget.type) ? <WidgetExtraVisual widget={widget} /> : <div className="widget-visual-rows">{widget.rows.map((row, index) => <div className="widget-visual-row" key={index}>
       {widget.showImages && row.imageUrl ? <img src={row.imageUrl} alt="" /> : widget.showImages && row.imageId ? <span className="widget-visual-image-id">✓</span> : null}
       <div className="widget-visual-copy"><strong>{row.title || `Элемент ${index + 1}`}</strong>
         {row.description ? <span>{row.description}</span> : null}
@@ -60,7 +67,8 @@ function WidgetVisual({ widget }) {
         {row.time ? <small>◷ {row.time}</small> : null}
       </div>
       {widget.showButtons && !['reviews', 'clients'].includes(widget.type) && row.button ? <span className={widget.type.startsWith('tiles_') ? 'widget-visual-link' : 'widget-visual-button'}>{row.button}</span> : null}
-    </div>)}</div>
+    </div>)}</div>}
+    {widget.moreText ? <div className="widget-visual-footer">{widget.moreText} ›</div> : null}
   </div>;
 }
 
@@ -131,13 +139,13 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const changeRow = (index, key, value) => setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, [key]: value } : row) }));
   const addRow = () => setDraft(current => ({ ...current, rows: [...current.rows, { ...EMPTY_ROW }] }));
   const removeRow = (index) => { setError(''); setNotice(''); setDraft(current => ({ ...current, rows: current.rows.filter((_, at) => at !== index) })); };
-  const uploadImage = async (index, file) => {
+  const uploadImage = async (index, file, team = null) => {
     if (!file) return;
     setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation(`image:${index}`);
     try {
       const image = await uploadWidgetImage(communityId, draft.type, file, launchParams);
       if (scopeRef.current !== scope) return;
-      setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...image } : row) }));
+      setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? (team ? { ...row, [team]: { ...row[team], ...image } } : { ...row, ...image }) : row) }));
       setNotice('Изображение загружено в VK. Сохраните черновик.');
     } catch (failure) { if (scopeRef.current === scope) setError(failure.message || 'Не удалось загрузить изображение в VK.'); }
     finally { if (scopeRef.current === scope) setBusy(false); }
@@ -252,13 +260,13 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     {!draft ? <>
       {!selectedType ? <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} disabled={busy} onClick={() => { setSelectedType(type); setError(''); setNotice(''); }}>
         <WidgetTypeThumbnail type={type} />
-        <strong>{label}</strong><span>{min}–{max} элементов · Сохранено: {catalogue.filter(widget => widget.type === type).length}</span></button>)}</div> :
+        <strong>{label}</strong><span>{type === 'text' ? 'Текст и описание' : type === 'donation' ? 'Цель и прогресс сбора' : type === 'table' ? '1–6 столбцов · 1–10 строк' : type === 'match' ? 'Две команды и счёт' : `${min}–${max} элементов`} · Сохранено: {catalogue.filter(widget => widget.type === type).length}</span></button>)}</div> :
         <button className="primary-button widget-create" type="button" disabled={busy} onClick={() => { setDraft({ ...createDraft(selectedType), name: '' }); setError(''); setNotice(''); setPublicationDetails(''); }}>+ Создать виджет</button>}
       {selectedType ? <>
       <h2>Сохранённые виджеты</h2>
       <p className="widget-field-hint">Активный — последний опубликованный через приложение. Если видимость изменена напрямую в VK, проверьте её в сообществе. Для удаления активного виджета сначала опубликуйте другой.</p>
       {catalogue.some(widget => widget.type === selectedType) ? <div className="widget-saved-grid">{catalogue.filter(widget => widget.type === selectedType).map(widget => <article className="widget-saved-card" key={widget.id}>
-        {widget.rows?.find(row => row.imageUrl)?.imageUrl ? <img src={widget.rows.find(row => row.imageUrl).imageUrl} alt="" /> : null}
+        {widget.rows?.find(row => row.imageUrl)?.imageUrl ? <img src={widget.rows.find(row => row.imageUrl).imageUrl} alt="" /> : EXTRA_TYPES.has(widget.type) ? <WidgetTypeThumbnail type={widget.type} /> : null}
         <h3>{widget.name}</h3><span className={widget.id === activeId ? 'widget-status widget-status-active' : 'widget-status'}>{widget.id === activeId ? 'Активный' : 'Неактивный'}</span>
         <p>{TYPE_BY_ID[widget.type]?.[1] || widget.type}</p>
         <div className="widget-card-actions">
@@ -274,11 +282,11 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <p className="widget-field-hint">Внутреннее название видно только в приложении. Например: «Осенняя акция».</p>
         <label>Заголовок виджета{hint(true)}<input value={draft.title} maxLength="80" onChange={event => change('title', event.target.value)} /></label>
         <label>Ссылка заголовка{hint(false, 'HTTPS-ссылка внутри VK')}<input type="url" value={draft.titleUrl} placeholder="https://vk.ru/..." onChange={event => change('titleUrl', event.target.value)} /></label>
-        <div className="widget-editor-options">
+        {!EXTRA_TYPES.has(draft.type) ? <div className="widget-editor-options">
           {!['tiles_wide', 'tiles_square', 'covers', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showImages} onChange={event => change('showImages', event.target.checked)} /> Изображения</label> : null}
           {!['reviews', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showButtons} onChange={event => change('showButtons', event.target.checked)} /> {draft.type.startsWith('tiles_') ? 'Ссылки под плитками' : 'Кнопки'}</label> : null}
           {draft.type === 'list' ? <label><input type="checkbox" checked={draft.detailed} onChange={event => change('detailed', event.target.checked)} /> Подробное описание</label> : null}
-        </div>
+        </div> : null}
         <label>Желаемая аудитория{hint(false, 'по умолчанию — всем')}<select value={draft.visibility} onChange={event => change('visibility', event.target.value)}>
           <option value="all">Всем пользователям</option><option value="subscribers">Подписчикам</option>
           <option value="admins">Администраторам</option><option value="none">Никому — не публиковать</option>
@@ -287,6 +295,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <label>Текст нижней ссылки{hint(Boolean(draft.moreUrl), 'заполняется вместе с адресом')}<input value={draft.moreText} maxLength="40" onChange={event => change('moreText', event.target.value)} /></label>
         <label>Адрес нижней ссылки{hint(Boolean(draft.moreText), 'заполняется вместе с текстом')}<input type="url" value={draft.moreUrl} placeholder="https://vk.ru/..." onChange={event => change('moreUrl', event.target.value)} /></label>
         <p className="widget-field-hint">Для черновика можно оставить поля публикации пустыми. Для публикации заполните обязательные поля каждого элемента. Ссылки — полные HTTPS-адреса внутри VK.</p>
+        {EXTRA_TYPES.has(draft.type) ? <WidgetExtraEditor draft={draft} change={change} changeRow={changeRow} busy={busy} hint={hint} feedbackAt={feedbackAt} onImage={(index, team, file) => setPendingImage({ index, team, file })} /> : <>
         <h2>Элементы <small>{draft.rows.length}/{limit}</small></h2>
         {draft.rows.map((row, index) => <div className="widget-row-editor" key={index}>
           <div className="widget-row-heading"><strong>Элемент {index + 1}</strong><button type="button" onClick={() => removeRow(index)} disabled={busy || draft.rows.length <= selected[2]}>Удалить</button></div>
@@ -320,6 +329,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
           {row.imageId ? <small>Загружено в VK: {row.imageId}</small> : <small>{draft.type === 'covers' ? 'Рекомендуем 510×128' : draft.type === 'tiles_wide' ? 'Рекомендуем 160×240' : draft.type === 'tiles_square' ? 'Рекомендуем 160×160' : 'Рекомендуем 50×50'} · JPG/PNG до 5 МБ</small>}</div> : null}
         </div>)}
         <button type="button" className="widget-secondary" disabled={draft.rows.length >= limit} onClick={addRow}>+ Добавить элемент</button>
+        </>}
       </div><div className="widget-preview-pane"><h2>Предпросмотр</h2><WidgetVisual widget={draft} />
         <button type="button" className="widget-secondary widget-preview-open" onClick={() => setFullPreview(true)}>Открыть полный предпросмотр</button>
         <p>Это пример компоновки. Окончательный вид и ссылки проверяются в VK перед публикацией.</p>
@@ -330,8 +340,9 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <button type="button" className="primary-button" disabled={busy} onClick={() => publish()}>Проверить и опубликовать в VK</button></div>
       {pendingImage ? <WidgetImageAdjuster file={pendingImage.file} type={draft.type} onCancel={() => setPendingImage(null)} onApply={file => {
         const index = pendingImage.index;
+        const team = pendingImage.team;
         setPendingImage(null);
-        uploadImage(index, file);
+        uploadImage(index, file, team);
       }} /> : null}
       {fullPreview ? <div className="widget-full-preview-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setFullPreview(false); }}>
         <section className="widget-full-preview" role="dialog" aria-modal="true" aria-label="Полный предпросмотр виджета">

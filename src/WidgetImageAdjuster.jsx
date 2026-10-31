@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 const SIZES = { tiles_wide: [160, 240], tiles_square: [160, 160], covers: [510, 128],
-  list: [50, 50], compact_list: [50, 50], reviews: [50, 50], clients: [50, 50] };
+  list: [50, 50], compact_list: [50, 50], reviews: [50, 50], clients: [50, 50], table: [24, 24], match: [50, 50], matches: [24, 24] };
 
 export default function WidgetImageAdjuster({ file, type, onCancel, onApply }) {
   const canvas = useRef(null);

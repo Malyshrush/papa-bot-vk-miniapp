@@ -3,7 +3,7 @@ import { PAPA_BOT_VK_APP_ID } from './vk.js';
 import { uploadWidgetImageRequest, lookupWidgetClientRequest } from './api.js';
 
 const TYPES = { tiles_wide: '160x240', tiles_square: '160x160', covers: '510x128',
-  list: '50x50', compact_list: '50x50', reviews: '50x50', clients: '50x50' };
+  list: '50x50', compact_list: '50x50', reviews: '50x50', clients: '50x50', table: '24x24', match: '50x50', matches: '24x24' };
 
 async function widgetToken(groupId) {
   const auth = await bridge.send('VKWebAppGetCommunityAuthToken', { app_id: PAPA_BOT_VK_APP_ID, group_id: groupId, scope: 'app_widget' });

@@ -824,6 +824,38 @@ button {
 .widget-mini-quote { fill: var(--link); font: bold 24px Georgia, serif; }
 .widget-mini-action, .widget-mini-link { fill: var(--link); }
 .widget-mini-divider { stroke: var(--border); }
+.widget-mini-score { fill: var(--text-primary); font: 500 20px Arial, sans-serif; }
+.widget-mini-score-small { fill: var(--text-primary); font: 500 14px Arial, sans-serif; }
+.widget-extra-editor, .widget-team-editor, .widget-match-events { display: grid; gap: 14px; min-width: 0; }
+.widget-extra-editor label { display: grid; gap: 6px; min-width: 0; color: var(--text-secondary); font-size: 13px; font-weight: 600; }
+.widget-extra-editor input, .widget-extra-editor select, .widget-extra-editor textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.widget-extra-editor .widget-inline-fields { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.widget-table-cell-editor { display: grid; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.widget-image-picker.widget-small-image-picker img { width: 50px; height: 50px; object-fit: contain; }
+.widget-visual-footer { border-top: 1px solid #444; margin-top: 12px; padding-top: 10px; text-align: center; color: #9bc7f1; overflow-wrap: anywhere; }
+.widget-extra-text { display: grid; gap: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.widget-extra-text p { margin: 0; }
+.widget-extra-text small, .widget-match-preview small, .widget-donation-preview small { color: #a9a9a9; }
+.widget-data-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.widget-data-table th, .widget-data-table td { padding: 8px 3px; border-bottom: 1px solid #444; overflow-wrap: anywhere; vertical-align: middle; font-size: 12px; }
+.widget-data-table th { color: #a9a9a9; font-weight: normal; }
+.widget-data-table td img { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; margin-right: 4px; }
+.widget-preview-link { color: #9bc7f1; }
+.widget-donation-preview { display: grid; gap: 10px; overflow-wrap: anywhere; }
+.widget-donation-preview p { margin: 0; }
+.widget-donation-preview > strong { font-size: 24px; }
+.widget-donation-preview .widget-visual-button { max-width: none; }
+.widget-progress-track { height: 7px; overflow: hidden; background: #3b3b3b; border-radius: 4px; }
+.widget-progress-track > div { height: 100%; background: #71aaeb; }
+.widget-match-preview { display: grid; gap: 8px; padding: 12px 0; text-align: center; border-bottom: 1px solid #444; }
+.widget-match-preview:last-child { border-bottom: 0; }
+.widget-match-scoreline { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
+.widget-match-team { display: grid; justify-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.widget-match-team img { width: 50px; max-width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; }
+.widget-visual--matches .widget-match-team img { width: 24px; height: 24px; }
+.widget-match-score { white-space: nowrap; font-size: 19px; }
+.widget-match-event-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.widget-match-event-columns > div { display: grid; gap: 4px; overflow-wrap: anywhere; }
 .widget-type-choice, .widget-draft-list button { text-align: left; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text-primary); padding: 18px; cursor: pointer; box-shadow: var(--shadow); }
 .widget-type-choice:hover, .widget-draft-list button:hover { border-color: var(--accent); transform: translateY(-1px); }
 .widget-type-choice strong, .widget-type-choice span, .widget-draft-list strong, .widget-draft-list span { display: block; }
@@ -891,6 +923,7 @@ button {
 .widget-full-preview > p { color: var(--text-muted); font-size: 13px; }
 .widget-visual { border: 1px solid #444; border-radius: 13px; background: #222; color: #f5f5f5; min-width: 0; padding: 12px; font-size: 13px; }
 .widget-visual-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.widget-visual-top strong { min-width: 0; overflow-wrap: anywhere; }
 .widget-visual-top span { color: #a2a2a2; font-size: 11px; }
 .widget-visual-row { display: flex; gap: 10px; align-items: center; min-height: 65px; padding: 9px 0; border-top: 1px solid #3b3b3b; }
 .widget-visual-row:first-child { border-top: 0; }

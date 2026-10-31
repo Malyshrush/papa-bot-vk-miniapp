@@ -21,6 +21,16 @@ export default function WidgetTypeThumbnail({ type }) {
     content = <>{image(13, 28, 214, 54, 0)}<rect x="13" y="28" width="214" height="54" fill="#102a44" opacity=".3" />
       <rect x="23" y="39" width="85" height="4" rx="2" fill="white" />{action(151, 60, 64, 'cover-action')}
       {text(13, 96, 128, 'cover-title')}{text(13, 105, 190, 'cover-descr')}</>;
+  } else if (type === 'text') {
+    content = <>{text(18, 35, 185, 'text1')}{text(18, 46, 203, 'text2')}{text(18, 57, 165, 'text3')}{text(18, 82, 190, 'description1')}{text(18, 93, 140, 'description2')}</>;
+  } else if (type === 'table') {
+    content = [0, 1, 2, 3].map(row => <g key={row}>{[0, 1, 2].map(column => text(18 + column * 72, 34 + row * 25, column === 0 ? 57 : 43, column))}<path d={`M13 ${46 + row * 25}H227`} className="widget-mini-divider" /></g>);
+  } else if (type === 'match') {
+    content = <><circle cx="48" cy="58" r="20" className="widget-mini-avatar" /><circle cx="192" cy="58" r="20" className="widget-mini-avatar" /><text x="120" y="65" textAnchor="middle" className="widget-mini-score">2 : 1</text>{text(26, 88, 44, 'team1')}{text(170, 88, 44, 'team2')}{text(83, 110, 74, 'state')}</>;
+  } else if (type === 'matches') {
+    content = [0, 1, 2].map(row => <g key={row}><circle cx="25" cy={39 + row * 32} r="9" className="widget-mini-avatar" />{text(43, 37 + row * 32, 51, 'team1')}<text x="123" y={43 + row * 32} textAnchor="middle" className="widget-mini-score-small">{row + 1} : 1</text>{text(153, 37 + row * 32, 61, 'team2')}</g>);
+  } else if (type === 'donation') {
+    content = <>{text(18, 34, 174, 'goal')}<text x="18" y="65" className="widget-mini-score">65 000 ₽</text><rect x="18" y="79" width="204" height="7" rx="3" className="widget-mini-avatar" /><rect x="18" y="79" width="133" height="7" rx="3" className="widget-mini-link" />{text(18, 96, 100, 'collected')}{action(129, 110, 93, 'donate')}</>;
   } else if (type === 'reviews') {
     content = [0, 1].map(i => <g key={i}><circle cx="25" cy={42 + i * 44} r="11" className="widget-mini-avatar" />
       {text(44, 33 + i * 44, 70, 'author')}{text(44, 43 + i * 44, 170, 'review1')}{text(44, 51 + i * 44, 143, 'review2')}

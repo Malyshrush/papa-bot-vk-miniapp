@@ -5,7 +5,7 @@ function collectWidgetIssues(widget = {}, publication = true) {
   const has = value => typeof value === 'string' && Boolean(value.trim());
   const add = (field, message) => issues.push({ field, message });
   const tile = ['tiles_wide', 'tiles_square'].includes(widget.type);
-  const limits = { tiles_wide: [3, 10], tiles_square: [3, 10], covers: [1, 3], list: [1, widget.detailed ? 3 : 6], compact_list: [1, 6], reviews: [1, 6], clients: [1, 6] }[widget.type];
+  const limits = { tiles_wide: [3, 10], tiles_square: [3, 10], covers: [1, 3], list: [1, widget.detailed ? 3 : 6], compact_list: [1, 6], reviews: [1, 6], clients: [1, 6], text: [0, 0], table: [1, 10], match: [1, 1], matches: [1, 6], donation: [0, 0] }[widget.type];
   if (!limits) { add('type', 'Выберите формат виджета.'); return issues; }
   if (!has(widget.name) && (publication || Object.hasOwn(widget, 'name'))) add('name', 'Укажите название виджета для приложения.');
   if (publication && !has(widget.title)) add('title', 'Добавьте заголовок виджета.');
@@ -21,6 +21,78 @@ function collectWidgetIssues(widget = {}, publication = true) {
   url('moreUrl', widget.moreUrl, 'Адрес нижней ссылки');
   if (publication && has(widget.moreText) && !has(widget.moreUrl)) add('moreUrl', 'Для ссылки внизу укажите адрес.');
   if (publication && has(widget.moreUrl) && !has(widget.moreText)) add('moreText', 'Укажите текст нижней ссылки или очистите её адрес.');
+  if (['text', 'table', 'match', 'matches', 'donation'].includes(widget.type)) {
+    const length = (field, value, max, label) => { if (String(value ?? '').length > max) add(field, `${label}: не более ${max} символов.`); };
+    const integer = (field, value, min, max, label, required = false) => {
+      if (value === '' || value === undefined || value === null) { if (publication && required) add(field, `${label}: укажите число.`); return; }
+      if (!/^-?\d+$/.test(String(value)) || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) add(field, `${label}: нужно целое число от ${min} до ${max}.`);
+    };
+    if (rows.length > limits[1]) add('rows', `Допускается не более ${limits[1]} элементов.`);
+    if (widget.type === 'text') {
+      length('text', widget.text, 200, 'Текст'); length('description', widget.description, 200, 'Описание');
+    }
+    if (widget.type === 'table') {
+      const columns = Array.isArray(widget.columns) ? widget.columns : [];
+      if (columns.length > 6 || (publication && columns.length < 1)) add('columns', 'В таблице должно быть от 1 до 6 столбцов.');
+      columns.forEach((column, index) => {
+        length(`columns.${index}.text`, column?.text, 50, `Столбец ${index + 1}`);
+        if (column?.align && !['left', 'center', 'right'].includes(column.align)) add(`columns.${index}.align`, `Столбец ${index + 1}: выберите выравнивание.`);
+      });
+      rows.forEach((row, index) => {
+        const cells = Array.isArray(row?.cells) ? row.cells : [];
+        if (cells.length > columns.length || (publication && cells.length !== columns.length)) add(`rows.${index}.cells`, `Строка ${index + 1}: число ячеек должно совпадать с числом столбцов.`);
+        cells.forEach((cell, at) => { length(`rows.${index}.cells.${at}.text`, cell?.text, 100, `Строка ${index + 1}, столбец ${at + 1}`); url(`rows.${index}.cells.${at}.url`, cell?.url, `Строка ${index + 1}, столбец ${at + 1}, ссылка`); });
+      });
+    }
+    if (['match', 'matches'].includes(widget.type)) rows.forEach((row, index) => {
+      const prefix = `Матч ${index + 1}`;
+      length(`rows.${index}.state`, row?.state, 50, `${prefix}, состояние`);
+      url(`rows.${index}.url`, row?.url, `${prefix}, ссылка`);
+      url(`rows.${index}.liveUrl`, row?.liveUrl, `${prefix}, трансляция`);
+      for (const team of ['teamA', 'teamB']) {
+        const label = `${prefix}, команда ${team === 'teamA' ? '1' : '2'}`;
+        if (publication && !has(row?.[team]?.name)) add(`rows.${index}.${team}.name`, `${label}: заполните название.`);
+        length(`rows.${index}.${team}.name`, row?.[team]?.name, 50, `${label}, название`);
+        length(`rows.${index}.${team}.description`, row?.[team]?.description, 50, `${label}, описание`);
+      }
+      if (publication && Boolean(row?.teamA?.imageId) !== Boolean(row?.teamB?.imageId)) add(`rows.${index}.teamB.imageId`, `${prefix}: загрузите логотипы обеих команд или удалите оба логотипа.`);
+      integer(`rows.${index}.scoreA`, row?.scoreA, -999, 999, `${prefix}, счёт команды 1`, true);
+      integer(`rows.${index}.scoreB`, row?.scoreB, -999, 999, `${prefix}, счёт команды 2`, true);
+      if (widget.type === 'match') for (const side of ['eventsA', 'eventsB']) {
+        const events = Array.isArray(row?.[side]) ? row[side] : [];
+        if (events.length > 6) add(`rows.${index}.${side}`, `${prefix}: допускается до 6 событий каждой команды.`);
+        events.forEach((event, at) => {
+          const label = `${prefix}, команда ${side === 'eventsA' ? '1' : '2'}, событие ${at + 1}`;
+          if (publication && !has(event?.event)) add(`rows.${index}.${side}.${at}.event`, `${label}: укажите игрока или событие.`);
+          length(`rows.${index}.${side}.${at}.event`, event?.event, 50, label);
+          integer(`rows.${index}.${side}.${at}.minute`, event?.minute, 0, 2147483647, `${label}, минута`, true);
+        });
+      }
+    });
+    if (widget.type === 'donation') {
+      const donation = widget.donation || {};
+      length('donation.text', donation.text, 80, 'Цель сбора');
+      url('donation.textUrl', donation.textUrl, 'Ссылка цели сбора'); url('donation.buttonUrl', donation.buttonUrl, 'Ссылка кнопки поддержки');
+      if (publication && !has(donation.buttonUrl)) add('donation.buttonUrl', 'Укажите ссылку кнопки поддержки на страницу VK.');
+      integer('donation.goal', donation.goal, 1, 99999999, 'Целевая сумма', true);
+      integer('donation.funded', donation.funded, 0, 99999999, 'Собранная сумма');
+      integer('donation.backers', donation.backers, 0, 99999999, 'Число участников');
+      if (donation.currency && !['RUB', 'USD', 'UAH', 'BYR', 'EUR', 'MDL', 'AZN', 'GEL', 'AMD', 'ILS', 'GBP', 'TMT', 'BYN', 'KZS', 'KZT'].includes(donation.currency)) add('donation.currency', 'Выберите валюту из списка.');
+      const hasStart = donation.start !== '' && donation.start != null;
+      const hasEnd = donation.end !== '' && donation.end != null;
+      if (publication && hasStart !== hasEnd) add('donation.end', 'Для периода сбора укажите обе даты или очистите обе.');
+      integer('donation.start', donation.start, 1, 21474836470, 'Дата начала'); integer('donation.end', donation.end, 1, 21474836470, 'Дата окончания');
+      if (publication && hasStart && hasEnd) {
+        const now = Date.now() / 1000;
+        if (Number(donation.start) >= Number(donation.end)) add('donation.end', 'Окончание сбора должно быть позже начала.');
+        const earliest = new Date(now * 1000); earliest.setUTCFullYear(earliest.getUTCFullYear() - 1);
+        const latest = new Date(now * 1000); latest.setUTCFullYear(latest.getUTCFullYear() + 10);
+        if (Number(donation.start) < earliest.getTime() / 1000) add('donation.start', 'Начало сбора не может быть раньше, чем год назад.');
+        if (Number(donation.end) > latest.getTime() / 1000) add('donation.end', 'Окончание сбора не может быть позже, чем через 10 лет.');
+      }
+    }
+    return issues;
+  }
   const linked = rows.some(row => has(row?.url));
   const described = tile && rows.some(row => has(row?.description));
   rows.forEach((entry, index) => {
