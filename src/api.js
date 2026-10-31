@@ -54,6 +54,7 @@ async function readJson(response) {
     const error = new Error(data.message || data.error || '\u041e\u0448\u0438\u0431\u043a\u0430 Mini App');
     error.code = String(data.error || '');
     error.status = response.status;
+    if (Number.isSafeInteger(data.vkCode) && data.vkCode >= 0 && data.vkCode < 1000000) error.vkCode = data.vkCode;
     throw error;
   }
   if (data.success !== true) {

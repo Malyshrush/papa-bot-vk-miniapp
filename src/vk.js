@@ -10,8 +10,12 @@ export async function requestWidgetAutomationToken(communityId) {
   const groupId = Number(communityId);
   if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error('Не выбрано сообщество VK.');
   const result = await sendBridgeWithTimeout('VKWebAppGetCommunityAuthToken', { app_id: PAPA_BOT_VK_APP_ID, group_id: groupId, scope: 'app_widget' }, 'VK не выдал разрешение автообновления. Повторите попытку.', 90000);
-  if (!result?.access_token || String(result.group_id || '') !== String(groupId)) throw new Error('VK не подтвердил разрешение для выбранного сообщества.');
-  return result.access_token;
+  // VK's documented reply may contain only access_token. Optional group_id is
+  // checked when supplied; the server always verifies the token's exact group.
+  const token = typeof result?.access_token === 'string' ? result.access_token : '';
+  if (token.length < 8 || token.length > 4096 || /\s|[\u0000-\u001f]/.test(token)) throw new Error('VK не выдал корректный ключ автообновления. Повторите запрос разрешения.');
+  if (result.group_id !== undefined && String(result.group_id) !== String(groupId)) throw new Error('VK не подтвердил разрешение для выбранного сообщества.');
+  return token;
 }
 export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 'docs', 'wall', 'market']);
 

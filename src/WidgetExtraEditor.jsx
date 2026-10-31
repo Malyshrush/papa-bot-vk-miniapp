@@ -38,7 +38,7 @@ export default function WidgetExtraEditor({ draft, change, changeRow, busy, hint
     const value = draft.donation || {};
     const update = (field, next) => change('donation', { ...value, [field]: next });
     return <div className="widget-extra-editor">
-      <p className="widget-field-hint">{draft.dataSource?.provider === 'donationalerts' ? 'После включения DonationAlerts сумма будет обновляться автоматически. Число участников задаётся вручную. Кнопка виджета откроет страницу перехода к DonationAlerts в Mini App.' : 'Суммы и число участников задаются вручную. Для автоматического учёта выберите DonationAlerts выше.'}</p>
+      <p className="widget-field-hint">{draft.dataSource?.provider === 'donationalerts' ? 'После включения автообновления сумма будет обновляться автоматически. Число участников задаётся вручную. После публикации кнопка виджета откроет страницу перехода к DonationAlerts в Mini App.' : 'Суммы и число участников задаются вручную. Для автоматического учёта выберите DonationAlerts выше.'}</p>
       <label>Цель сбора{hint(false, 'до 80 символов')}<input value={value.text || ''} maxLength={80} onChange={event => update('text', event.target.value)} /></label>
       <label>Ссылка цели сбора{hint(false)}<input type="url" value={value.textUrl || ''} placeholder="https://vk.ru/..." onChange={event => update('textUrl', event.target.value)} /></label>
       {draft.dataSource?.provider !== 'donationalerts' ? <label>Ссылка кнопки поддержки{hint(true, 'страница сбора внутри VK')}<input type="url" value={value.buttonUrl || ''} placeholder="https://vk.ru/..." onChange={event => update('buttonUrl', event.target.value)} /></label> : null}

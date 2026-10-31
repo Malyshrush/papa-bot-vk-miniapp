@@ -66,7 +66,7 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
       if (action === 'donation-disconnect') setAuthUrl('');
     } catch (failure) {
       try { const latest = await call('status'); if (alive.current && generation.current === attempt) setStatus(latest); } catch (_) { /* preserve the last status */ }
-      if (alive.current && generation.current === attempt) setError(failure.message || 'Не удалось выполнить действие.');
+      if (alive.current && generation.current === attempt) setError((failure.message || 'Не удалось выполнить действие.') + (Number.isSafeInteger(failure.vkCode) ? ` Код VK: ${failure.vkCode}.` : ''));
     }
     finally { if (alive.current && generation.current === attempt) setBusy(false); }
   };
@@ -84,6 +84,7 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
       {source === 'donationalerts' ? <>
         <p>{status?.donationAlerts?.connected ? `Подключён DonationAlerts: ${status.donationAlerts.account}` : 'DonationAlerts пока не подключён.'}</p>
         <p className="widget-field-hint">Сумма учитывает новые донаты после запуска этого сбора, в выбранной валюте. Число участников задаётся вручную. Копейки учитываются в расчёте, шкала VK показывает целые единицы валюты. Один активный сбор получает все новые донаты подключённого аккаунта.</p>
+        <p className="widget-field-hint">После подключения аккаунта сохраните и опубликуйте сбор: это подтвердит получателя для кнопки поддержки. Автообновление суммы включается отдельно. При смене аккаунта опубликуйте виджет заново.</p>
         <div className="widget-integration-actions"><button type="button" className="widget-secondary" disabled={blocked} onClick={() => run('donation-start')}>{status?.donationAlerts?.connected ? 'Подключить другой аккаунт' : 'Подключить DonationAlerts'}</button>
           {status?.donationAlerts?.connected ? <button type="button" className="widget-secondary" disabled={blocked} onClick={() => run('donation-disconnect')}>Отключить DonationAlerts</button> : null}</div>
         {authUrl ? <p><a href={authUrl} target="_blank" rel="noopener noreferrer">Подтвердить доступ в DonationAlerts</a></p> : null}
