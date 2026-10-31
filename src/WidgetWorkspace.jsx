@@ -252,9 +252,10 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
       {!selectedType ? <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} disabled={busy} onClick={() => { setSelectedType(type); setError(''); setNotice(''); }}>
         <strong>{label}</strong><span>{min}–{max} элементов · Сохранено: {catalogue.filter(widget => widget.type === type).length}</span></button>)}</div> :
         <button className="primary-button widget-create" type="button" disabled={busy} onClick={() => { setDraft({ ...createDraft(selectedType), name: '' }); setError(''); setNotice(''); setPublicationDetails(''); }}>+ Создать виджет</button>}
-      <h2>{selectedType ? 'Сохранённые виджеты' : 'Мои виджеты'}</h2>
+      {selectedType ? <>
+      <h2>Сохранённые виджеты</h2>
       <p className="widget-field-hint">Активный — последний опубликованный через приложение. Если видимость изменена напрямую в VK, проверьте её в сообществе. Для удаления активного виджета сначала опубликуйте другой.</p>
-      {catalogue.some(widget => !selectedType || widget.type === selectedType) ? <div className="widget-saved-grid">{catalogue.filter(widget => !selectedType || widget.type === selectedType).map(widget => <article className="widget-saved-card" key={widget.id}>
+      {catalogue.some(widget => widget.type === selectedType) ? <div className="widget-saved-grid">{catalogue.filter(widget => widget.type === selectedType).map(widget => <article className="widget-saved-card" key={widget.id}>
         {widget.rows?.find(row => row.imageUrl)?.imageUrl ? <img src={widget.rows.find(row => row.imageUrl).imageUrl} alt="" /> : null}
         <h3>{widget.name}</h3><span className={widget.id === activeId ? 'widget-status widget-status-active' : 'widget-status'}>{widget.id === activeId ? 'Активный' : 'Неактивный'}</span>
         <p>{TYPE_BY_ID[widget.type]?.[1] || widget.type}</p>
@@ -264,6 +265,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
           <button type="button" className="widget-secondary" disabled={busy || widget.id === activeId} onClick={() => removeWidget(widget)}>Удалить</button>
         </div>
       </article>)}</div> : <p>В этом разделе пока нет сохранённых виджетов. Создайте первый.</p>}
+      </> : null}
     </> : <>
       <div className="widget-editor-grid"><div className="widget-editor-fields">
         <label>Название в кабинете<small className="widget-requirement">Обязательно для черновика и публикации</small><input value={draft.name} maxLength="80" onChange={event => change('name', event.target.value)} /></label>
