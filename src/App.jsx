@@ -546,6 +546,10 @@ export default function App() {
   useEffect(() => {
     const refreshAfterExternalNavigation = () => {
       if (document.visibilityState === 'visible') {
+        // Reloading an editor unmounts its form and discards unsaved input and
+        // scroll position. Public subscription pages still refresh on return.
+        const route = parseRouteHash();
+        if (route.widgets || route.admin) return;
         loadCurrentRoute(true);
       }
     };
