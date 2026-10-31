@@ -3,6 +3,7 @@ import { confirmWidget, deleteWidget, loadWidgets, previewWidget, saveWidget } f
 import { showCommunityWidgetPreview } from './vk.js';
 import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
 import WidgetImageAdjuster from './WidgetImageAdjuster.jsx';
+import { collectWidgetIssues, widgetValidationError } from './widget-validation.js';
 
 const TYPES = [
   ['tiles_wide', 'Прямоугольные плитки', 3, 10],
@@ -81,7 +82,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
 
   useEffect(() => {
     if (!error) return undefined;
-    const timeout = window.setTimeout(() => setError(''), error.includes('Ответы:') ? 90000 : 12000);
+    const timeout = window.setTimeout(() => setError(''), error.includes('Ответы:') ? 90000 : error.startsWith('Для ') ? 45000 : 12000);
     return () => window.clearTimeout(timeout);
   }, [error]);
   useEffect(() => {
@@ -152,7 +153,8 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   };
 
   const persist = async (notify = true) => {
-    if (!draft.name?.trim()) throw new Error('Укажите название виджета для приложения.');
+    const issues = collectWidgetIssues(draft, false);
+    if (issues.length) throw widgetValidationError(issues, false);
     const data = await saveWidget(communityId, draft, launchParams);
     if (scopeRef.current !== scope) return data.widget;
     setDraft(data.widget);
@@ -173,6 +175,8 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     let stage = 'сохранение черновика';
     let draftSaved = false;
     try {
+      const issues = collectWidgetIssues(existing || draft);
+      if (issues.length) throw widgetValidationError(issues);
       const saved = existing || await persist(false);
       if (scopeRef.current !== scope) return;
       draftSaved = true;
@@ -192,10 +196,16 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
       stage = 'сохранение результата в PAPA BOT';
       const confirmed = await confirmWidget(communityId, saved.id, fresh.activeId || '', launchParams);
       if (scopeRef.current !== scope) return;
+      if (confirmed.activeId !== saved.id) throw new Error('Сервер не подтвердил выбранный виджет.');
       setActiveId(confirmed.activeId);
-      setNotice('Системное окно VK завершилось без ошибки. Проверьте блок в сообществе: это ещё не подтверждение его публикации.');
+      setNotice('Виджет опубликован в сообществе. Проверьте публикацию.');
     } catch (failure) {
       if (scopeRef.current !== scope) return;
+      if (failure?.code === 'invalid_widget' || failure?.status === 400) {
+        setError(`${failure.message}\nМожно продолжить заполнение или сохранить незавершённый виджет в черновик. Для черновика нужны внутреннее название и корректные введённые ссылки.`);
+        setPublicationDetails('');
+        return;
+      }
       setError(stage === 'системное окно VK' ? 'VK не подтвердил публикацию.' :
         failure?.status === 400 && typeof failure?.message === 'string' ? failure.message.slice(0, 200) : 'Не удалось завершить публикацию.');
       setPublicationDetails(publicationDiagnostic(stage, failure, draftSaved));
@@ -216,6 +226,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const openWidget = widget => { setSelectedType(widget.type); setDraft(structuredClone(widget)); setError(''); setNotice(''); setPublicationDetails(''); };
 
   const selected = TYPE_BY_ID[draft?.type];
+  const hint = (required, detail = '') => <small className="widget-requirement">{required ? 'Обязательно для публикации' : 'Необязательно'}{detail ? ` · ${detail}` : ''}</small>;
   const limit = draft?.type === 'list' && draft.detailed ? 3 : selected?.[3];
   const detailedUploadError = error.includes('Ответы:');
   const feedbackAt = location => feedbackLocation === location && (error || notice || publicationDetails) ? <div className="widget-feedback-stack" ref={feedbackRef} aria-live="polite">
@@ -225,7 +236,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     </div> : detailedUploadError ? <div className="widget-upload-diagnostic">
       <span>Изображение не сохранено. Нажмите на поле ниже, скопируйте диагностику и пришлите её разработчику.</span>
       <label>Диагностика загрузки VK<textarea readOnly rows={6} value={error} onFocus={event => event.target.select()} /></label>
-    </div> : error}<button type="button" aria-label="Закрыть ошибку" onClick={() => { setError(''); setPublicationDetails(''); }}>×</button></div> : null}
+    </div> : <div className="widget-validation-message">{error}</div>}<button type="button" aria-label="Закрыть ошибку" onClick={() => { setError(''); setPublicationDetails(''); }}>×</button></div> : null}
     {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
   </div> : null;
   return <section className="widget-workspace" aria-label="Виджеты сообщества">
@@ -255,37 +266,38 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
       </article>)}</div> : <p>В этом разделе пока нет сохранённых виджетов. Создайте первый.</p>}
     </> : <>
       <div className="widget-editor-grid"><div className="widget-editor-fields">
-        <label>Название в кабинете<input value={draft.name} maxLength="80" onChange={event => change('name', event.target.value)} /></label>
+        <label>Название в кабинете<small className="widget-requirement">Обязательно для черновика и публикации</small><input value={draft.name} maxLength="80" onChange={event => change('name', event.target.value)} /></label>
         <p className="widget-field-hint">Внутреннее название видно только в приложении. Например: «Осенняя акция».</p>
-        <label>Заголовок виджета<input value={draft.title} maxLength="80" onChange={event => change('title', event.target.value)} /></label>
-        <label>Ссылка заголовка<input type="url" value={draft.titleUrl} placeholder="https://vk.ru/..." onChange={event => change('titleUrl', event.target.value)} /></label>
+        <label>Заголовок виджета{hint(true)}<input value={draft.title} maxLength="80" onChange={event => change('title', event.target.value)} /></label>
+        <label>Ссылка заголовка{hint(false, 'HTTPS-ссылка внутри VK')}<input type="url" value={draft.titleUrl} placeholder="https://vk.ru/..." onChange={event => change('titleUrl', event.target.value)} /></label>
         <div className="widget-editor-options">
           {!['tiles_wide', 'tiles_square', 'covers', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showImages} onChange={event => change('showImages', event.target.checked)} /> Изображения</label> : null}
           {!['reviews', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showButtons} onChange={event => change('showButtons', event.target.checked)} /> {draft.type.startsWith('tiles_') ? 'Ссылки под плитками' : 'Кнопки'}</label> : null}
           {draft.type === 'list' ? <label><input type="checkbox" checked={draft.detailed} onChange={event => change('detailed', event.target.checked)} /> Подробное описание</label> : null}
         </div>
-        <label>Желаемая аудитория<select value={draft.visibility} onChange={event => change('visibility', event.target.value)}>
+        <label>Желаемая аудитория{hint(false, 'по умолчанию — всем')}<select value={draft.visibility} onChange={event => change('visibility', event.target.value)}>
           <option value="all">Всем пользователям</option><option value="subscribers">Подписчикам</option>
           <option value="admins">Администраторам</option><option value="none">Никому — не публиковать</option>
         </select></label>
         <p className="widget-field-hint">Итоговую аудиторию, включая «Никому», выберите в системном окне VK при публикации. Один лишь выбор здесь не меняет видимость в сообществе.</p>
-        <label>Текст нижней ссылки<input value={draft.moreText} maxLength="40" onChange={event => change('moreText', event.target.value)} /></label>
-        <label>Адрес нижней ссылки<input type="url" value={draft.moreUrl} placeholder="https://vk.ru/..." onChange={event => change('moreUrl', event.target.value)} /></label>
+        <label>Текст нижней ссылки{hint(Boolean(draft.moreUrl), 'заполняется вместе с адресом')}<input value={draft.moreText} maxLength="40" onChange={event => change('moreText', event.target.value)} /></label>
+        <label>Адрес нижней ссылки{hint(Boolean(draft.moreText), 'заполняется вместе с текстом')}<input type="url" value={draft.moreUrl} placeholder="https://vk.ru/..." onChange={event => change('moreUrl', event.target.value)} /></label>
+        <p className="widget-field-hint">Для черновика можно оставить поля публикации пустыми. Для публикации заполните обязательные поля каждого элемента. Ссылки — полные HTTPS-адреса внутри VK.</p>
         <h2>Элементы <small>{draft.rows.length}/{limit}</small></h2>
         {draft.rows.map((row, index) => <div className="widget-row-editor" key={index}>
           <div className="widget-row-heading"><strong>Элемент {index + 1}</strong><button type="button" onClick={() => removeRow(index)} disabled={busy || draft.rows.length <= selected[2]}>Удалить</button></div>
-          <label>{draft.type === 'reviews' ? 'Имя автора' : 'Название'}<input value={row.title} maxLength="100" onChange={event => changeRow(index, 'title', event.target.value)} /></label>
-          <label>{draft.type === 'reviews' ? 'Текст отзыва' : 'Описание'}<textarea value={row.description} maxLength="300" onChange={event => changeRow(index, 'description', event.target.value)} /></label>
-          {draft.detailed ? <label>Подробное описание<textarea value={row.detail} maxLength="300" onChange={event => changeRow(index, 'detail', event.target.value)} /></label> : null}
+          <label>{draft.type === 'reviews' ? 'Имя автора' : 'Название'}{hint(true)}<input value={row.title} maxLength="100" onChange={event => changeRow(index, 'title', event.target.value)} /></label>
+          <label>{draft.type === 'reviews' ? 'Текст отзыва' : 'Описание'}{hint(draft.type === 'reviews' || (draft.type.startsWith('tiles_') && draft.rows.some(item => item.description?.trim())), draft.type.startsWith('tiles_') ? 'у всех плиток или ни у одной' : '')}<textarea value={row.description} maxLength="300" onChange={event => changeRow(index, 'description', event.target.value)} /></label>
+          {draft.detailed ? <label>Подробное описание{hint(false)}<textarea value={row.detail} maxLength="300" onChange={event => changeRow(index, 'detail', event.target.value)} /></label> : null}
           {['list', 'compact_list'].includes(draft.type) ? <div className="widget-inline-fields">
-            <label>Адрес<input value={row.address} maxLength="100" onChange={event => changeRow(index, 'address', event.target.value)} /></label>
-            <label>Время<input value={row.time} maxLength="100" onChange={event => changeRow(index, 'time', event.target.value)} /></label>
+            <label>Адрес{hint(false)}<input value={row.address} maxLength="100" onChange={event => changeRow(index, 'address', event.target.value)} /></label>
+            <label>Время{hint(false)}<input value={row.time} maxLength="100" onChange={event => changeRow(index, 'time', event.target.value)} /></label>
           </div> : null}
-          <label>{draft.type.startsWith('tiles_') ? 'Адрес плитки' : 'Ссылка элемента'}<input type="url" value={row.url} placeholder="https://vk.ru/..." onChange={event => {
+          <label>{draft.type.startsWith('tiles_') ? 'Адрес плитки' : 'Ссылка элемента'}{hint(draft.type === 'clients' || draft.rows.some(item => item.url?.trim()), draft.type === 'clients' ? 'после ввода нажмите «Загрузить сообщество клиента»' : 'у всех элементов или ни у одного')}<input type="url" value={row.url} placeholder="https://vk.ru/..." onChange={event => {
             changeRow(index, 'url', event.target.value);
           }} /></label>
           {draft.type === 'clients' ? <><button type="button" className="widget-secondary" disabled={busy} onClick={() => loadClient(index)}>Загрузить сообщество клиента</button>{feedbackAt(`client:${index}`)}</> : null}
-          {groups.length ? <label>Или страница подписки<select value="" onChange={event => {
+          {groups.length ? <label>Или страница подписки{hint(false, 'можно выбрать вместо ручного ввода ссылки')}<select value="" onChange={event => {
             const slug = event.target.value;
             if (slug) {
               const url = `https://vk.ru/app54600849#${new URLSearchParams({ c: communityId, g: slug })}`;
@@ -294,10 +306,11 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
             }
           }}><option value="">Выберите направление</option>{groups.map(group => <option value={group.slug} key={group.slug}>{group.title}</option>)}</select></label> : null}
           {draft.showButtons ? <div className="widget-inline-fields">
-            <label>{draft.type.startsWith('tiles_') ? 'Текст ссылки под плиткой' : 'Кнопка'}<input value={row.button} maxLength="40" onChange={event => changeRow(index, 'button', event.target.value)} /></label>
-            <label>{draft.type.startsWith('tiles_') ? 'Адрес ссылки под плиткой' : 'Ссылка кнопки'}<input type="url" value={row.buttonUrl} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'buttonUrl', event.target.value)} /></label>
+            <label>{draft.type.startsWith('tiles_') ? 'Текст ссылки под плиткой' : 'Кнопка'}{hint(Boolean(row.buttonUrl), 'можно оставить действие целиком пустым')}<input value={row.button} maxLength="40" onChange={event => changeRow(index, 'button', event.target.value)} /></label>
+            <label>{draft.type.startsWith('tiles_') ? 'Адрес ссылки под плиткой' : 'Ссылка кнопки'}{hint(Boolean(row.button) && !(draft.type.startsWith('tiles_') && row.url), draft.type.startsWith('tiles_') ? 'если пусто, используется адрес плитки' : 'нужен при заполненном тексте кнопки')}<input type="url" value={row.buttonUrl} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'buttonUrl', event.target.value)} /></label>
           </div> : null}
           {draft.showImages && draft.type !== 'clients' ? <div className="widget-image-picker">{feedbackAt(`image:${index}`)}<label>Изображение для VK
+            {hint(['tiles_wide', 'tiles_square', 'covers'].includes(draft.type), 'сначала загрузите кадр в VK')}
             <input type="file" accept="image/jpeg,image/png" disabled={busy} onChange={event => { if (event.target.files?.[0]) setPendingImage({ index, file: event.target.files[0] }); event.target.value = ''; }} />
           </label>{row.imageUrl ? <img src={row.imageUrl} alt={`Изображение элемента ${index + 1}`} /> : null}
           {row.imageId ? <small>Загружено в VK: {row.imageId}</small> : <small>{draft.type === 'covers' ? 'Рекомендуем 510×128' : draft.type === 'tiles_wide' ? 'Рекомендуем 160×240' : draft.type === 'tiles_square' ? 'Рекомендуем 160×160' : 'Рекомендуем 50×50'} · JPG/PNG до 5 МБ</small>}</div> : null}

@@ -886,6 +886,9 @@ button {
 .widget-visual-copy span, .widget-visual-copy small { color: #a9a9a9; overflow-wrap: anywhere; }
 .widget-visual-button { display: inline-block; min-width: 0; max-width: 120px; border-radius: 6px; background: #e7e9ec; color: #181818; text-align: center; padding: 7px; overflow-wrap: anywhere; }
 .widget-visual-link { display: block; margin-top: 5px; color: #9bc7f1; overflow-wrap: anywhere; }
+.widget-requirement { display: block; margin: 3px 0 5px; color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.widget-feedback-stack .inline-error { white-space: pre-line; }
+.widget-validation-message { max-height: 240px; overflow: auto; min-width: 0; overflow-wrap: anywhere; }
 .widget-visual--tiles_wide .widget-visual-rows, .widget-visual--tiles_square .widget-visual-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 116px), 1fr)); gap: 8px; }
 .widget-visual--tiles_wide .widget-visual-row, .widget-visual--tiles_square .widget-visual-row { display: block; border: 0; padding: 0; }
 .widget-visual--tiles_wide .widget-visual-button, .widget-visual--tiles_square .widget-visual-button { display: block; width: 100%; max-width: none; box-sizing: border-box; }
