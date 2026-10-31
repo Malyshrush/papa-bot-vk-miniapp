@@ -178,6 +178,10 @@ export function confirmWidget(communityId, widgetId, expectedActiveId, launchPar
   return widgetAction('widget-confirm', communityId, { widgetId, expectedActiveId }, launchParams);
 }
 
+export function deleteWidget(communityId, widgetId, expectedActiveId, launchParams) {
+  return widgetAction('widget-delete', communityId, { widgetId, expectedActiveId }, launchParams);
+}
+
 export function uploadWidgetImageRequest(communityId, payload, launchParams) {
   return requestJson(buildUrl({ miniapp: 'widget-image-upload', c: communityId }), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

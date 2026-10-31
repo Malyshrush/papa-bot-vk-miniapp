@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmWidget, loadWidgets, previewWidget, saveWidget } from './api.js';
+import { confirmWidget, deleteWidget, loadWidgets, previewWidget, saveWidget } from './api.js';
 import { showCommunityWidgetPreview } from './vk.js';
 import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
 import WidgetImageAdjuster from './WidgetImageAdjuster.jsx';
@@ -66,6 +66,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [catalogue, setCatalogue] = useState([]);
   const [activeId, setActiveId] = useState('');
   const [draft, setDraft] = useState(null);
+  const [selectedType, setSelectedType] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -74,6 +75,9 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [pendingImage, setPendingImage] = useState(null);
   const [fullPreview, setFullPreview] = useState(false);
   const feedbackRef = useRef(null);
+  const scope = `${communityId}:${launchParams?.sign || ''}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
 
   useEffect(() => {
     if (!error) return undefined;
@@ -104,6 +108,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
 
   const refresh = async () => {
     const data = await loadWidgets(communityId, launchParams);
+    if (scopeRef.current !== scope) return data;
     setCatalogue(data.widgets || []);
     setActiveId(data.activeId || '');
     return data;
@@ -111,6 +116,9 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
 
   useEffect(() => {
     let live = true;
+    setDraft(null); setSelectedType(''); setCatalogue([]); setActiveId('');
+    setPendingImage(null); setFullPreview(false); setBusy(false);
+    setError(''); setNotice(''); setPublicationDetails('');
     loadWidgets(communityId, launchParams).then(data => {
       if (live) { setCatalogue(data.widgets || []); setActiveId(data.activeId || ''); }
     }).catch(failure => { if (live) { setFeedbackLocation('top'); setError(failure.message || 'Не удалось загрузить виджеты.'); } });
@@ -126,62 +134,86 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation(`image:${index}`);
     try {
       const image = await uploadWidgetImage(communityId, draft.type, file, launchParams);
+      if (scopeRef.current !== scope) return;
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...image } : row) }));
       setNotice('Изображение загружено в VK. Сохраните черновик.');
-    } catch (failure) { setError(failure.message || 'Не удалось загрузить изображение в VK.'); }
-    finally { setBusy(false); }
+    } catch (failure) { if (scopeRef.current === scope) setError(failure.message || 'Не удалось загрузить изображение в VK.'); }
+    finally { if (scopeRef.current === scope) setBusy(false); }
   };
   const loadClient = async (index) => {
     setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation(`client:${index}`);
     try {
       const client = await resolveWidgetClient(communityId, draft.rows[index].url, launchParams);
+      if (scopeRef.current !== scope) return;
       setDraft(current => ({ ...current, rows: current.rows.map((row, at) => at === index ? { ...row, ...client } : row) }));
       setNotice('Сообщество клиента найдено в VK. Сохраните черновик.');
-    } catch (failure) { setError(failure.message || 'VK не нашёл клиента.'); }
-    finally { setBusy(false); }
+    } catch (failure) { if (scopeRef.current === scope) setError(failure.message || 'VK не нашёл клиента.'); }
+    finally { if (scopeRef.current === scope) setBusy(false); }
   };
 
   const persist = async (notify = true) => {
+    if (!draft.name?.trim()) throw new Error('Укажите название виджета для приложения.');
     const data = await saveWidget(communityId, draft, launchParams);
+    if (scopeRef.current !== scope) return data.widget;
     setDraft(data.widget);
     await refresh();
+    if (scopeRef.current !== scope) return data.widget;
     if (notify) setNotice('Черновик сохранён. Сообщество пока не изменено.');
     return data.widget;
   };
 
   const save = async () => {
     setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation('actions');
-    try { await persist(); } catch (failure) { setError(failure.message || 'Не удалось сохранить виджет.'); }
-    finally { setBusy(false); }
+    try { await persist(); } catch (failure) { if (scopeRef.current === scope) setError(failure.message || 'Не удалось сохранить виджет.'); }
+    finally { if (scopeRef.current === scope) setBusy(false); }
   };
 
-  const publish = async () => {
-    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation('actions');
+  const publish = async (existing = null) => {
+    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation(existing ? 'top' : 'actions');
     let stage = 'сохранение черновика';
     let draftSaved = false;
     try {
-      const saved = await persist(false);
+      const saved = existing || await persist(false);
+      if (scopeRef.current !== scope) return;
       draftSaved = true;
       stage = 'проверка текущего виджета';
       const fresh = await refresh();
+      if (scopeRef.current !== scope) return;
       const previous = fresh.widgets?.find(widget => widget.id === fresh.activeId);
       if (previous && previous.id !== saved.id && previous.type !== saved.type &&
         !window.confirm('Публикация этого виджета отключит виджет другого типа. Продолжить?')) return;
       stage = 'проверка и подготовка виджета';
       const compiled = await previewWidget(communityId, saved.id, launchParams);
+      if (scopeRef.current !== scope) return;
       stage = 'системное окно VK';
       const accepted = await showCommunityWidgetPreview(communityId, compiled.type, compiled.code);
+      if (scopeRef.current !== scope) return;
       if (!accepted) { setNotice('Публикация отменена в VK. Черновик сохранён.'); return; }
       stage = 'сохранение результата в PAPA BOT';
       const confirmed = await confirmWidget(communityId, saved.id, fresh.activeId || '', launchParams);
+      if (scopeRef.current !== scope) return;
       setActiveId(confirmed.activeId);
       setNotice('Системное окно VK завершилось без ошибки. Проверьте блок в сообществе: это ещё не подтверждение его публикации.');
     } catch (failure) {
+      if (scopeRef.current !== scope) return;
       setError(stage === 'системное окно VK' ? 'VK не подтвердил публикацию.' :
         failure?.status === 400 && typeof failure?.message === 'string' ? failure.message.slice(0, 200) : 'Не удалось завершить публикацию.');
       setPublicationDetails(publicationDiagnostic(stage, failure, draftSaved));
-    } finally { setBusy(false); }
+    } finally { if (scopeRef.current === scope) setBusy(false); }
   };
+
+  const removeWidget = async widget => {
+    if (!window.confirm(`Удалить «${widget.name}» из приложения?`)) return;
+    setBusy(true); setError(''); setNotice(''); setPublicationDetails(''); setFeedbackLocation('top');
+    try {
+      const data = await deleteWidget(communityId, widget.id, activeId, launchParams);
+      if (scopeRef.current !== scope) return;
+      setCatalogue(data.widgets); setActiveId(data.activeId || '');
+      setNotice('Виджет удалён из приложения.');
+    } catch (failure) { if (scopeRef.current === scope) setError(failure.message || 'Не удалось удалить виджет.'); }
+    finally { if (scopeRef.current === scope) setBusy(false); }
+  };
+  const openWidget = widget => { setSelectedType(widget.type); setDraft(structuredClone(widget)); setError(''); setNotice(''); setPublicationDetails(''); };
 
   const selected = TYPE_BY_ID[draft?.type];
   const limit = draft?.type === 'list' && draft.detailed ? 3 : selected?.[3];
@@ -197,21 +229,34 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     {notice ? <div className="widget-notice" role="status">{notice}<button type="button" aria-label="Закрыть уведомление" onClick={() => setNotice('')}>×</button></div> : null}
   </div> : null;
   return <section className="widget-workspace" aria-label="Виджеты сообщества">
-    <button className="back-button" type="button" onClick={draft ? () => setDraft(null) : onBack}>Назад</button>
+    <button className="back-button" type="button" disabled={busy} onClick={() => {
+      setError(''); setNotice(''); setPublicationDetails('');
+      if (draft) setDraft(null); else if (selectedType) setSelectedType(''); else onBack();
+    }}>Назад</button>
     <p className="admin-workspace-kicker">PAPA BOT · Сообщество {communityId}</p>
-    <h1>{draft ? draft.name : 'Виджеты сообщества'}</h1>
+    <h1>{draft ? draft.name || 'Новый виджет' : selectedType ? TYPE_BY_ID[selectedType][1] : 'Виджеты сообщества'}</h1>
     <p>Соберите виджет, проверьте его здесь и подтвердите публикацию в окне VK. Один блок сообщества показывает один опубликованный виджет.</p>
     {feedbackAt('top')}
     {!draft ? <>
-      <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} onClick={() => { setDraft(createDraft(type)); setError(''); setNotice(''); }}>
-        <strong>{label}</strong><span>{min}–{max} элементов</span></button>)}</div>
-      <h2>Мои виджеты</h2>
-      {catalogue.length ? <div className="widget-draft-list">{catalogue.map(widget => <button type="button" key={widget.id} onClick={() => { setDraft(widget); setError(''); setNotice(''); }}>
-        <strong>{widget.name}</strong><span>{TYPE_BY_ID[widget.type]?.[1] || widget.type} · {widget.id === activeId ? 'последний выбранный в окне VK · проверьте на странице' : 'черновик'}</span>
-      </button>)}</div> : <p>Черновиков пока нет. Выберите формат выше.</p>}
+      {!selectedType ? <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} disabled={busy} onClick={() => { setSelectedType(type); setError(''); setNotice(''); }}>
+        <strong>{label}</strong><span>{min}–{max} элементов · Сохранено: {catalogue.filter(widget => widget.type === type).length}</span></button>)}</div> :
+        <button className="primary-button widget-create" type="button" disabled={busy} onClick={() => { setDraft({ ...createDraft(selectedType), name: '' }); setError(''); setNotice(''); setPublicationDetails(''); }}>+ Создать виджет</button>}
+      <h2>{selectedType ? 'Сохранённые виджеты' : 'Мои виджеты'}</h2>
+      <p className="widget-field-hint">Активный — последний опубликованный через приложение. Если видимость изменена напрямую в VK, проверьте её в сообществе. Для удаления активного виджета сначала опубликуйте другой.</p>
+      {catalogue.some(widget => !selectedType || widget.type === selectedType) ? <div className="widget-saved-grid">{catalogue.filter(widget => !selectedType || widget.type === selectedType).map(widget => <article className="widget-saved-card" key={widget.id}>
+        {widget.rows?.find(row => row.imageUrl)?.imageUrl ? <img src={widget.rows.find(row => row.imageUrl).imageUrl} alt="" /> : null}
+        <h3>{widget.name}</h3><span className={widget.id === activeId ? 'widget-status widget-status-active' : 'widget-status'}>{widget.id === activeId ? 'Активный' : 'Неактивный'}</span>
+        <p>{TYPE_BY_ID[widget.type]?.[1] || widget.type}</p>
+        <div className="widget-card-actions">
+          <button type="button" className="widget-secondary" disabled={busy} onClick={() => openWidget(widget)}>Редактировать</button>
+          <button type="button" className="widget-secondary" disabled={busy} onClick={() => publish(widget)}>{widget.id === activeId ? 'Опубликовать снова' : 'Активировать'}</button>
+          <button type="button" className="widget-secondary" disabled={busy || widget.id === activeId} onClick={() => removeWidget(widget)}>Удалить</button>
+        </div>
+      </article>)}</div> : <p>В этом разделе пока нет сохранённых виджетов. Создайте первый.</p>}
     </> : <>
       <div className="widget-editor-grid"><div className="widget-editor-fields">
         <label>Название в кабинете<input value={draft.name} maxLength="80" onChange={event => change('name', event.target.value)} /></label>
+        <p className="widget-field-hint">Внутреннее название видно только в приложении. Например: «Осенняя акция».</p>
         <label>Заголовок виджета<input value={draft.title} maxLength="80" onChange={event => change('title', event.target.value)} /></label>
         <label>Ссылка заголовка<input type="url" value={draft.titleUrl} placeholder="https://vk.ru/..." onChange={event => change('titleUrl', event.target.value)} /></label>
         <div className="widget-editor-options">
@@ -263,7 +308,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
       </div></div>
       {feedbackAt('actions')}
       <div className="widget-editor-actions"><button type="button" className="widget-secondary" disabled={busy} onClick={save}>{busy ? 'Подождите…' : 'Сохранить черновик'}</button>
-        <button type="button" className="primary-button" disabled={busy} onClick={publish}>Проверить и опубликовать в VK</button></div>
+        <button type="button" className="primary-button" disabled={busy} onClick={() => publish()}>Проверить и опубликовать в VK</button></div>
       {pendingImage ? <WidgetImageAdjuster file={pendingImage.file} type={draft.type} onCancel={() => setPendingImage(null)} onApply={file => {
         const index = pendingImage.index;
         setPendingImage(null);
