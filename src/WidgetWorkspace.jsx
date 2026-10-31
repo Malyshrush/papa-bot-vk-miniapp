@@ -3,6 +3,7 @@ import { confirmWidget, deleteWidget, loadWidgets, previewWidget, saveWidget } f
 import { showCommunityWidgetPreview } from './vk.js';
 import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
 import WidgetImageAdjuster from './WidgetImageAdjuster.jsx';
+import WidgetTypeThumbnail from './WidgetTypeThumbnail.jsx';
 import { collectWidgetIssues, widgetValidationError } from './widget-validation.js';
 
 const TYPES = [
@@ -250,6 +251,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     {feedbackAt('top')}
     {!draft ? <>
       {!selectedType ? <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} disabled={busy} onClick={() => { setSelectedType(type); setError(''); setNotice(''); }}>
+        <WidgetTypeThumbnail type={type} />
         <strong>{label}</strong><span>{min}–{max} элементов · Сохранено: {catalogue.filter(widget => widget.type === type).length}</span></button>)}</div> :
         <button className="primary-button widget-create" type="button" disabled={busy} onClick={() => { setDraft({ ...createDraft(selectedType), name: '' }); setError(''); setNotice(''); setPublicationDetails(''); }}>+ Создать виджет</button>}
       {selectedType ? <>
@@ -261,8 +263,8 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <p>{TYPE_BY_ID[widget.type]?.[1] || widget.type}</p>
         <div className="widget-card-actions">
           <button type="button" className="widget-secondary" disabled={busy} onClick={() => openWidget(widget)}>Редактировать</button>
-          <button type="button" className="widget-secondary" disabled={busy} onClick={() => publish(widget)}>{widget.id === activeId ? 'Опубликовать снова' : 'Активировать'}</button>
-          <button type="button" className="widget-secondary" disabled={busy || widget.id === activeId} onClick={() => removeWidget(widget)}>Удалить</button>
+          <button type="button" className="widget-secondary widget-action-publish" disabled={busy} onClick={() => publish(widget)}>{widget.id === activeId ? 'Опубликовать снова' : 'Активировать'}</button>
+          <button type="button" className="widget-secondary widget-action-delete" disabled={busy || widget.id === activeId} onClick={() => removeWidget(widget)}>Удалить</button>
         </div>
       </article>)}</div> : <p>В этом разделе пока нет сохранённых виджетов. Создайте первый.</p>}
       </> : null}
