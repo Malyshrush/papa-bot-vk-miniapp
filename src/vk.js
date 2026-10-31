@@ -10,9 +10,17 @@ export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 
 export async function showCommunityWidgetPreview(communityId, type, code) {
   const groupId = Number(communityId);
   if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error('Выберите сообщество VK.');
-  const result = await sendBridgeWithTimeout('VKWebAppShowCommunityWidgetPreviewBox', {
-    group_id: groupId, type, code
-  }, 'VK не ответил на запрос публикации. Проверьте виджет в сообществе перед повторной попыткой.', 120000);
+  let result;
+  try {
+    result = await sendBridgeWithTimeout('VKWebAppShowCommunityWidgetPreviewBox', {
+      group_id: groupId, type, code
+    }, 'VK не ответил на запрос публикации. Проверьте виджет в сообществе перед повторной попыткой.', 120000);
+  } catch (error) {
+    // Closing VK's confirmation dialog is reported as client error 4 (User denied).
+    // API/auth errors and other client failures must remain visible as errors.
+    if (error?.error_type === 'client_error' && error?.error_data?.error_code === 4) return false;
+    throw error;
+  }
   if (result?.result === true) return true;
   if (result?.result === false) return false;
   throw { error_type: 'unexpected_result' };

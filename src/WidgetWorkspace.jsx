@@ -192,7 +192,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
       stage = 'системное окно VK';
       const accepted = await showCommunityWidgetPreview(communityId, compiled.type, compiled.code);
       if (scopeRef.current !== scope) return;
-      if (!accepted) { setNotice('Публикация отменена в VK. Черновик сохранён.'); return; }
+      if (!accepted) { setNotice('Публикация отменена. Черновик сохранён.'); return; }
       stage = 'сохранение результата в PAPA BOT';
       const confirmed = await confirmWidget(communityId, saved.id, fresh.activeId || '', launchParams);
       if (scopeRef.current !== scope) return;
