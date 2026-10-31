@@ -57,7 +57,7 @@ function WidgetVisual({ widget }) {
         {row.address ? <small>⌖ {row.address}</small> : null}
         {row.time ? <small>◷ {row.time}</small> : null}
       </div>
-      {widget.showButtons && row.button ? <span className="widget-visual-button">{row.button}</span> : null}
+      {widget.showButtons && !['reviews', 'clients'].includes(widget.type) && row.button ? <span className={widget.type.startsWith('tiles_') ? 'widget-visual-link' : 'widget-visual-button'}>{row.button}</span> : null}
     </div>)}</div>
   </div>;
 }
@@ -261,7 +261,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <label>Ссылка заголовка<input type="url" value={draft.titleUrl} placeholder="https://vk.ru/..." onChange={event => change('titleUrl', event.target.value)} /></label>
         <div className="widget-editor-options">
           {!['tiles_wide', 'tiles_square', 'covers', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showImages} onChange={event => change('showImages', event.target.checked)} /> Изображения</label> : null}
-          {!['reviews', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showButtons} onChange={event => change('showButtons', event.target.checked)} /> Кнопки</label> : null}
+          {!['reviews', 'clients'].includes(draft.type) ? <label><input type="checkbox" checked={draft.showButtons} onChange={event => change('showButtons', event.target.checked)} /> {draft.type.startsWith('tiles_') ? 'Ссылки под плитками' : 'Кнопки'}</label> : null}
           {draft.type === 'list' ? <label><input type="checkbox" checked={draft.detailed} onChange={event => change('detailed', event.target.checked)} /> Подробное описание</label> : null}
         </div>
         <label>Желаемая аудитория<select value={draft.visibility} onChange={event => change('visibility', event.target.value)}>
@@ -281,7 +281,11 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
             <label>Адрес<input value={row.address} maxLength="100" onChange={event => changeRow(index, 'address', event.target.value)} /></label>
             <label>Время<input value={row.time} maxLength="100" onChange={event => changeRow(index, 'time', event.target.value)} /></label>
           </div> : null}
-          <label>Ссылка элемента<input type="url" value={row.url} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'url', event.target.value)} /></label>
+          <label>{draft.type.startsWith('tiles_') ? 'Адрес плитки' : 'Ссылка элемента'}<input type="url" value={draft.type.startsWith('tiles_') ? row.buttonUrl || row.url : row.url} placeholder="https://vk.ru/..." onChange={event => {
+            changeRow(index, 'url', event.target.value);
+            if (draft.type.startsWith('tiles_')) changeRow(index, 'buttonUrl', event.target.value);
+          }} /></label>
+          {draft.type.startsWith('tiles_') ? <p className="widget-field-hint">Изображение и ссылка под плиткой открывают один адрес. {row.url && row.buttonUrl && row.url !== row.buttonUrl ? 'Ранее сохранены разные адреса — укажите единый адрес в поле выше.' : ''}</p> : null}
           {draft.type === 'clients' ? <><button type="button" className="widget-secondary" disabled={busy} onClick={() => loadClient(index)}>Загрузить сообщество клиента</button>{feedbackAt(`client:${index}`)}</> : null}
           {groups.length ? <label>Или страница подписки<select value="" onChange={event => {
             const slug = event.target.value;
@@ -292,8 +296,8 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
             }
           }}><option value="">Выберите направление</option>{groups.map(group => <option value={group.slug} key={group.slug}>{group.title}</option>)}</select></label> : null}
           {draft.showButtons ? <div className="widget-inline-fields">
-            <label>Кнопка<input value={row.button} maxLength="40" onChange={event => changeRow(index, 'button', event.target.value)} /></label>
-            <label>Ссылка кнопки<input type="url" value={row.buttonUrl} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'buttonUrl', event.target.value)} /></label>
+            <label>{draft.type.startsWith('tiles_') ? 'Текст ссылки под плиткой' : 'Кнопка'}<input value={row.button} maxLength="40" onChange={event => changeRow(index, 'button', event.target.value)} /></label>
+            {!draft.type.startsWith('tiles_') ? <label>Ссылка кнопки<input type="url" value={row.buttonUrl} placeholder="https://vk.ru/..." onChange={event => changeRow(index, 'buttonUrl', event.target.value)} /></label> : null}
           </div> : null}
           {draft.showImages && draft.type !== 'clients' ? <div className="widget-image-picker">{feedbackAt(`image:${index}`)}<label>Изображение для VK
             <input type="file" accept="image/jpeg,image/png" disabled={busy} onChange={event => { if (event.target.files?.[0]) setPendingImage({ index, file: event.target.files[0] }); event.target.value = ''; }} />
