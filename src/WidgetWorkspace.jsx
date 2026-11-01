@@ -77,6 +77,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [catalogue, setCatalogue] = useState([]);
   const [activeId, setActiveId] = useState('');
   const [draft, setDraft] = useState(null);
+  const [editorSession, setEditorSession] = useState(0);
   const [managedBalance, setManagedBalance] = useState(null);
   const [selectedType, setSelectedType] = useState('');
   const [busy, setBusy] = useState(false);
@@ -234,7 +235,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
     } catch (failure) { if (scopeRef.current === scope) setError(failure.message || 'Не удалось удалить виджет.'); }
     finally { if (scopeRef.current === scope) setBusy(false); }
   };
-  const openWidget = widget => { setSelectedType(widget.type); setDraft(structuredClone(widget)); setError(''); setNotice(''); setPublicationDetails(''); };
+  const openWidget = widget => { setEditorSession(value => value + 1); setSelectedType(widget.type); setDraft(structuredClone(widget)); setError(''); setNotice(''); setPublicationDetails(''); };
 
   const selected = TYPE_BY_ID[draft?.type];
   const hint = (required, detail = '') => <small className="widget-requirement">{required ? 'Обязательно для публикации' : 'Необязательно'}{detail ? ` · ${detail}` : ''}</small>;
@@ -263,7 +264,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
       {!selectedType ? <div className="widget-type-grid">{TYPES.map(([type, label, min, max]) => <button className="widget-type-choice" type="button" key={type} disabled={busy} onClick={() => { setSelectedType(type); setError(''); setNotice(''); }}>
         <WidgetTypeThumbnail type={type} />
         <strong>{label}</strong><span>{type === 'text' ? 'Текст и описание' : type === 'donation' ? 'Цель и прогресс сбора' : type === 'table' ? '1–6 столбцов · 1–10 строк' : type === 'match' ? 'Две команды и счёт' : `${min}–${max} элементов`} · Сохранено: {catalogue.filter(widget => widget.type === type).length}</span></button>)}</div> :
-        <button className="primary-button widget-create" type="button" disabled={busy} onClick={() => { setDraft({ ...createDraft(selectedType), name: '' }); setError(''); setNotice(''); setPublicationDetails(''); }}>+ Создать виджет</button>}
+        <button className="primary-button widget-create" type="button" disabled={busy} onClick={() => { setEditorSession(value => value + 1); setDraft({ ...createDraft(selectedType), name: '' }); setError(''); setNotice(''); setPublicationDetails(''); }}>+ Создать виджет</button>}
       {selectedType ? <>
       <h2>Сохранённые виджеты</h2>
       <p className="widget-field-hint">Активный — последний опубликованный через приложение. Если видимость изменена напрямую в VK, проверьте её в сообществе. Для удаления активного виджета сначала опубликуйте другой.</p>
@@ -297,7 +298,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <label>Текст нижней ссылки{hint(Boolean(draft.moreUrl), 'заполняется вместе с адресом')}<input value={draft.moreText} maxLength="40" onChange={event => change('moreText', event.target.value)} /></label>
         <label>Адрес нижней ссылки{hint(Boolean(draft.moreText), 'заполняется вместе с текстом')}<input type="url" value={draft.moreUrl} placeholder="https://vk.ru/..." onChange={event => change('moreUrl', event.target.value)} /></label>
         <p className="widget-field-hint">Для черновика можно оставить поля публикации пустыми. Для публикации заполните обязательные поля каждого элемента. Ссылки — полные HTTPS-адреса внутри VK.</p>
-        {['donation', 'match', 'matches'].includes(draft.type) ? <WidgetIntegrationPanel key={`${communityId}:${draft.id || 'new'}:${draft.type}`} draft={draft} savedWidget={catalogue.find(widget => widget.id === draft.id)} communityId={communityId} launchParams={launchParams} activeId={activeId} revision={catalogue} change={change} externalBusy={busy} onManagedBalance={setManagedBalance} onImport={(widget, persisted = false) => { setDraft(widget); if (persisted) setCatalogue(current => current.map(item => item.id === widget.id ? widget : item)); }} /> : null}
+        {['donation', 'match', 'matches'].includes(draft.type) ? <WidgetIntegrationPanel key={`${communityId}:${editorSession}:${draft.type}`} draft={draft} savedWidget={catalogue.find(widget => widget.id === draft.id)} communityId={communityId} launchParams={launchParams} activeId={activeId} revision={catalogue} change={change} externalBusy={busy} onManagedBalance={setManagedBalance} onImport={(widget, persisted = false) => { setDraft(widget); if (persisted) setCatalogue(current => current.map(item => item.id === widget.id ? widget : item)); }} /> : null}
         {EXTRA_TYPES.has(draft.type) ? <WidgetExtraEditor draft={draft} change={change} changeRow={changeRow} busy={busy} hint={hint} managedBalance={managedBalance?.widgetId === draft.id && managedBalance?.communityId === communityId && managedBalance?.managed} feedbackAt={feedbackAt} onImage={(index, team, file) => setPendingImage({ index, team, file })} /> : <>
         <h2>Элементы <small>{draft.rows.length}/{limit}</small></h2>
         {draft.rows.map((row, index) => <div className="widget-row-editor" key={index}>
