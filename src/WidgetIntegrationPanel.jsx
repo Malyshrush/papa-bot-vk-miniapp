@@ -17,6 +17,7 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
   const [limited, setLimited] = useState(false);
   const alive = useRef(true);
   const generation = useRef(0);
+  const intervalEdited = useRef(false);
   const source = draft.dataSource?.provider || 'manual';
   const ids = draft.dataSource?.fixtureIds || [];
   const allowed = draft.type === 'donation' ? 'donationalerts' : 'api-football';
@@ -28,6 +29,10 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
   };
   useEffect(() => { alive.current = true; refresh(); return () => { alive.current = false; generation.current++; }; }, [communityId, launchParams?.sign]);
   useEffect(() => { refresh(); }, [activeId, revision]);
+  useEffect(() => {
+    const saved = status?.automation;
+    if (!intervalEdited.current && saved && saved.widgetId === draft.id && [1, 5, 15, 60].includes(saved.intervalMinutes)) setIntervalMinutes(saved.intervalMinutes);
+  }, [status, draft.id]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 10000); return () => clearTimeout(timer);
@@ -105,7 +110,7 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
         <button type="button" className="widget-secondary" disabled={blocked || !ids.length || !status?.football?.connected} onClick={() => run('import', { widget: draft })}>Загрузить данные матчей</button>
         <p className="widget-field-hint">Названия, счёт и состояние обновляются из API-Football. Логотипы загружаются отдельно. Доступность лиг и задержка данных зависят от тарифа.</p>
       </>}
-      <label>Интервал проверки<select value={intervalMinutes} disabled={blocked} onChange={event => setIntervalMinutes(Number(event.target.value))}>{[1, 5, 15, 60].map(value => <option key={value} value={value}>{value} мин.</option>)}</select></label>
+      <label>Интервал проверки<select value={intervalMinutes} disabled={blocked} onChange={event => { intervalEdited.current = true; setIntervalMinutes(Number(event.target.value)); }}>{[1, 5, 15, 60].map(value => <option key={value} value={value}>{value} мин.</option>)}</select></label>
       <p className="widget-field-hint">Чаще проверка — больше запросов к провайдеру. Расписание выполняется сервером; фактическое время последней проверки показано ниже.</p>
       <p>{running ? 'Автообновление этого виджета включено.' : 'Автообновление этого виджета выключено.'}</p>
       {automation?.pausedForEditing ? <p className="widget-field-hint">При сохранении и подготовке публикации автообновление приостанавливается. После публикации включите его снова.</p> : null}
