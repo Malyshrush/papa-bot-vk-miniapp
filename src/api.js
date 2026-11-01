@@ -160,11 +160,11 @@ export function loadWidgets(communityId, launchParams) {
   return requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'widgets', c: communityId }, launchParams)));
 }
 
-function widgetAction(action, communityId, payload, launchParams) {
+function widgetAction(action, communityId, payload, launchParams, timeoutMs = REQUEST_TIMEOUT_MS) {
   return requestJson(buildUrl({ miniapp: action, c: communityId }), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ launchParams, ...payload })
-  });
+  }, timeoutMs);
 }
 
 export function saveWidget(communityId, widget, launchParams) {
@@ -176,7 +176,7 @@ export function previewWidget(communityId, widgetId, launchParams) {
 }
 
 export function confirmWidget(communityId, widgetId, expectedActiveId, launchParams) {
-  return widgetAction('widget-confirm', communityId, { widgetId, expectedActiveId }, launchParams);
+  return widgetAction('widget-confirm', communityId, { widgetId, expectedActiveId }, launchParams, 90000);
 }
 
 export function deleteWidget(communityId, widgetId, expectedActiveId, launchParams) {

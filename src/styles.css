@@ -831,6 +831,9 @@ button {
 .widget-integration-panel label { display: grid; gap: 6px; min-width: 0; }
 .widget-integration-panel input, .widget-integration-panel select { min-width: 0; box-sizing: border-box; }
 .widget-integration-panel p { margin: 0; overflow-wrap: anywhere; }
+.widget-sync-diagnostics { display: grid; gap: 10px; min-width: 0; }
+.widget-sync-diagnostics textarea { width: 100%; box-sizing: border-box; min-height: 10rem; max-height: 20rem; resize: vertical; }
+.widget-sync-diagnostics .widget-secondary { width: 100%; }
 .widget-integration-panel small { display: block; overflow-wrap: anywhere; }
 .widget-integration-panel .widget-inline-fields { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
 @media (max-width: 480px) { .widget-integration-panel .widget-inline-fields { grid-template-columns: minmax(0,1fr); } }

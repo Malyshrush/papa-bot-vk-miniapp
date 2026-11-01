@@ -77,6 +77,7 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
   const [catalogue, setCatalogue] = useState([]);
   const [activeId, setActiveId] = useState('');
   const [draft, setDraft] = useState(null);
+  const [managedBalance, setManagedBalance] = useState(null);
   const [selectedType, setSelectedType] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -296,8 +297,8 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
         <label>Текст нижней ссылки{hint(Boolean(draft.moreUrl), 'заполняется вместе с адресом')}<input value={draft.moreText} maxLength="40" onChange={event => change('moreText', event.target.value)} /></label>
         <label>Адрес нижней ссылки{hint(Boolean(draft.moreText), 'заполняется вместе с текстом')}<input type="url" value={draft.moreUrl} placeholder="https://vk.ru/..." onChange={event => change('moreUrl', event.target.value)} /></label>
         <p className="widget-field-hint">Для черновика можно оставить поля публикации пустыми. Для публикации заполните обязательные поля каждого элемента. Ссылки — полные HTTPS-адреса внутри VK.</p>
-        {['donation', 'match', 'matches'].includes(draft.type) ? <WidgetIntegrationPanel key={`${communityId}:${draft.id || 'new'}:${draft.type}`} draft={draft} savedWidget={catalogue.find(widget => widget.id === draft.id)} communityId={communityId} launchParams={launchParams} activeId={activeId} revision={catalogue} change={change} externalBusy={busy} onImport={(widget, persisted = false) => { setDraft(widget); if (persisted) setCatalogue(current => current.map(item => item.id === widget.id ? widget : item)); }} /> : null}
-        {EXTRA_TYPES.has(draft.type) ? <WidgetExtraEditor draft={draft} change={change} changeRow={changeRow} busy={busy} hint={hint} feedbackAt={feedbackAt} onImage={(index, team, file) => setPendingImage({ index, team, file })} /> : <>
+        {['donation', 'match', 'matches'].includes(draft.type) ? <WidgetIntegrationPanel key={`${communityId}:${draft.id || 'new'}:${draft.type}`} draft={draft} savedWidget={catalogue.find(widget => widget.id === draft.id)} communityId={communityId} launchParams={launchParams} activeId={activeId} revision={catalogue} change={change} externalBusy={busy} onManagedBalance={setManagedBalance} onImport={(widget, persisted = false) => { setDraft(widget); if (persisted) setCatalogue(current => current.map(item => item.id === widget.id ? widget : item)); }} /> : null}
+        {EXTRA_TYPES.has(draft.type) ? <WidgetExtraEditor draft={draft} change={change} changeRow={changeRow} busy={busy} hint={hint} managedBalance={managedBalance?.widgetId === draft.id && managedBalance?.communityId === communityId && managedBalance?.managed} feedbackAt={feedbackAt} onImage={(index, team, file) => setPendingImage({ index, team, file })} /> : <>
         <h2>Элементы <small>{draft.rows.length}/{limit}</small></h2>
         {draft.rows.map((row, index) => <div className="widget-row-editor" key={index}>
           <div className="widget-row-heading"><strong>Элемент {index + 1}</strong><button type="button" onClick={() => removeRow(index)} disabled={busy || draft.rows.length <= selected[2]}>Удалить</button></div>

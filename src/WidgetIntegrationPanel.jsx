@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { widgetIntegration } from './api.js';
 import { requestWidgetAutomationToken } from './vk.js';
 
-export default function WidgetIntegrationPanel({ draft, savedWidget, communityId, launchParams, activeId, revision, change, onImport, externalBusy }) {
+export default function WidgetIntegrationPanel({ draft, savedWidget, communityId, launchParams, activeId, revision, change, onImport, externalBusy, onManagedBalance }) {
   const [status, setStatus] = useState(null);
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -15,9 +15,12 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
   const [filter, setFilter] = useState('');
   const [fixtures, setFixtures] = useState(null);
   const [limited, setLimited] = useState(false);
+  const [report, setReport] = useState('');
+  const [initialFunded, setInitialFunded] = useState('');
   const alive = useRef(true);
   const generation = useRef(0);
   const intervalEdited = useRef(false);
+  const reportRef = useRef(null);
   const source = draft.dataSource?.provider || 'manual';
   const ids = draft.dataSource?.fixtureIds || [];
   const allowed = draft.type === 'donation' ? 'donationalerts' : 'api-football';
@@ -27,8 +30,11 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
     const attempt = generation.current;
     try { const result = await call('status'); if (alive.current && generation.current === attempt) { setStatus(result); setError(''); } } catch (failure) { if (alive.current && generation.current === attempt) setError(failure.message); }
   };
-  useEffect(() => { alive.current = true; refresh(); return () => { alive.current = false; generation.current++; }; }, [communityId, launchParams?.sign]);
+  useEffect(() => { alive.current = true; setReport(''); setStatus(null); setKey(''); setInitialFunded(''); intervalEdited.current = false; refresh(); return () => { alive.current = false; generation.current++; }; }, [communityId, launchParams?.sign]);
   useEffect(() => { refresh(); }, [activeId, revision]);
+  useEffect(() => { onManagedBalance?.({ communityId, widgetId: draft.id, managed: (status?.automation?.widgetId === draft.id && Number.isSafeInteger(status?.automation?.trackedMinor)) || Boolean(status?.collections?.some(item => item.widgetId === draft.id)) }); }, [status, draft.id, communityId, onManagedBalance]);
+  useEffect(() => { if (!report) return; const timer = setTimeout(() => setReport(''), 300000); return () => clearTimeout(timer); }, [report]);
+  useEffect(() => { if (!report) return; const frame = requestAnimationFrame(() => reportRef.current?.scrollIntoView({ block: 'nearest' })); return () => cancelAnimationFrame(frame); }, [report]);
   useEffect(() => {
     const saved = status?.automation;
     if (!intervalEdited.current && saved && saved.widgetId === draft.id && [1, 5, 15, 60].includes(saved.intervalMinutes)) setIntervalMinutes(saved.intervalMinutes);
@@ -64,7 +70,8 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
         const url = new URL(result.authorizationUrl);
         if (url.origin !== 'https://www.donationalerts.com' || url.pathname !== '/oauth/authorize' || url.username || url.password || url.hash) throw new Error('Некорректный адрес подключения DonationAlerts.');
         setAuthUrl(url.href); setStatus(result.status);
-      } else if (action === 'import') { onImport(result.widget); setStatus(result.status); setNotice('Данные матчей загружены. Сохраните черновик и опубликуйте виджет.'); }
+      } else if (action === 'diagnostics') { setReport(JSON.stringify(result.report, null, 2)); }
+      else if (action === 'import') { onImport(result.widget); setStatus(result.status); setNotice('Данные матчей загружены. Сохраните черновик и опубликуйте виджет.'); }
       else if (action === 'football-fixtures') { setFixtures(result.fixtures || []); setLimited(result.limited === true); setStatus(result.status); }
       else { setStatus(result); if (result.widget && ['enable', 'sync'].includes(action)) onImport(result.widget, true); setNotice(action === 'enable' ? 'Автообновление включено. VK подтвердил обновление.' : action === 'disable' ? 'Автообновление выключено.' : action === 'sync' ? 'Проверка данных завершена.' : 'Подключение сохранено.'); }
       if (action === 'football-connect') setKey('');
@@ -77,6 +84,7 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
   };
   const setSource = provider => { change('dataSource', { provider, fixtureIds: ids }); if (provider === 'manual' && source === 'donationalerts') change('donation', { ...draft.donation, buttonUrl: '' }); setError(''); setNotice(''); };
   const automation = status?.automation;
+  const trackedMinor = automation && automation.widgetId === draft.id ? automation.trackedMinor : status?.collections?.find(item => item.widgetId === draft.id)?.trackedMinor;
   const selectedActive = Boolean(draft.id && draft.id === activeId);
   const unsaved = !savedWidget || JSON.stringify(savedWidget) !== JSON.stringify(draft);
   const running = automation?.enabled && automation.widgetId === draft.id;
@@ -113,7 +121,8 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
       <label>Интервал проверки<select value={intervalMinutes} disabled={blocked} onChange={event => { intervalEdited.current = true; setIntervalMinutes(Number(event.target.value)); }}>{[1, 5, 15, 60].map(value => <option key={value} value={value}>{value} мин.</option>)}</select></label>
       <p className="widget-field-hint">Чаще проверка — больше запросов к провайдеру. Расписание выполняется сервером; фактическое время последней проверки показано ниже.</p>
       <p>{running ? 'Автообновление этого виджета включено.' : 'Автообновление этого виджета выключено.'}</p>
-      {automation?.pausedForEditing ? <p className="widget-field-hint">При сохранении и подготовке публикации автообновление приостанавливается. После публикации включите его снова.</p> : null}
+      {automation?.pausedForEditing ? <p className="widget-field-hint">Автообновление приостановлено изменением активного виджета или подготовкой публикации. Завершите публикацию или продолжите текущий сбор кнопкой включения.</p> : null}
+      {draft.type === 'donation' && Number.isSafeInteger(trackedMinor) ? <p>Учтено PAPA BOT: {new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(trackedMinor / 100)} {draft.donation?.currency || 'RUB'}. Прогресс этого сбора сохраняется при переключении виджетов.</p> : null}
       {automation?.lastCheckedAt ? <small>Последняя проверка: {new Date(automation.lastCheckedAt).toLocaleString('ru-RU')}</small> : null}
       {automation?.lastUpdatedAt ? <small>Обновление VK: {new Date(automation.lastUpdatedAt).toLocaleString('ru-RU')}</small> : null}
       {running && automation?.nextCheckAt ? <small>Следующая проверка не раньше: {new Date(automation.nextCheckAt).toLocaleString('ru-RU')}</small> : null}
@@ -125,9 +134,11 @@ export default function WidgetIntegrationPanel({ draft, savedWidget, communityId
       <div className="widget-integration-actions"><button type="button" className="widget-secondary" disabled={blocked || !selectedActive || unsaved} onClick={() => run('enable', { widgetId: draft.id, intervalMinutes })}>{running ? 'Обновить разрешение VK' : 'Включить автообновление'}</button>
         <button type="button" className="widget-secondary" disabled={blocked || !running || unsaved} onClick={() => run('sync')}>Обновить сейчас</button>
         <button type="button" className="widget-secondary" disabled={blocked || !running} onClick={() => run('disable')}>Выключить автообновление</button></div>
-      {draft.type === 'donation' && selectedActive ? <button type="button" className="widget-secondary" disabled={blocked || unsaved} onClick={() => { if (window.confirm('Начать учёт новых донатов с текущей суммы виджета? Поступления до этого момента не прибавятся.')) run('enable', { widgetId: draft.id, intervalMinutes, reset: true }); }}>Начать новый период учёта</button> : null}
+      {draft.type === 'donation' && selectedActive ? <details><summary>Новый период учёта</summary><label>Начальная сумма нового периода<input type="number" min="0" max="99999999" step="1" value={initialFunded} placeholder={draft.donation?.funded || '0'} onChange={event => setInitialFunded(event.target.value)} /></label><button type="button" className="widget-secondary" disabled={blocked || unsaved} onClick={() => { if (window.confirm('Начать новый период? Текущая сумма этого сбора будет заменена, а поступления до этого момента не прибавятся.')) run('enable', { widgetId: draft.id, intervalMinutes, reset: true, ...(initialFunded !== '' ? { initialFunded } : {}) }); }}>Начать новый период учёта</button></details> : null}
     </> : null}
     <button type="button" className="widget-secondary" disabled={blocked} onClick={refresh}>Обновить состояние подключения</button>
+    <button type="button" className="widget-secondary" disabled={blocked} onClick={() => run('diagnostics', { widgetId: draft.id })}>Диагностика автообновления</button>
+    {report ? <div className="widget-sync-diagnostics" ref={reportRef}><label>Отчёт для разработчика<textarea readOnly rows={10} value={report} spellCheck={false} onFocus={event => event.target.select()} /></label><button type="button" className="widget-secondary" onClick={async () => { try { await navigator.clipboard.writeText(report); setNotice('Диагностика скопирована.'); } catch (_) { setNotice('Выделите и скопируйте текст отчёта.'); } }}>Скопировать диагностику</button></div> : null}
     {busy ? <p role="status">Подождите…</p> : null}
     {error && source !== 'manual' ? <p className="widget-integration-error" role="alert">{error}</p> : null}
     {notice ? <p className="widget-integration-notice" role="status">{notice}</p> : null}

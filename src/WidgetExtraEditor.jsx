@@ -17,7 +17,7 @@ function dateValue(timestamp) {
   return local.toISOString().slice(0, 16);
 }
 
-export default function WidgetExtraEditor({ draft, change, changeRow, busy, hint, onImage, feedbackAt }) {
+export default function WidgetExtraEditor({ draft, change, changeRow, busy, hint, onImage, feedbackAt, managedBalance }) {
   const image = (value, index, team, label) => <div className="widget-image-picker widget-small-image-picker">
     <label>{label}{hint(false, team ? 'логотипы команд — у обеих или ни у одной' : 'иконка только для первой ячейки')}
       <input type="file" accept="image/jpeg,image/png" disabled={busy} onChange={event => { if (event.target.files?.[0]) onImage(index, team, event.target.files[0]); event.target.value = ''; }} />
@@ -45,7 +45,7 @@ export default function WidgetExtraEditor({ draft, change, changeRow, busy, hint
       <label>Валюта{hint(true)}<select value={value.currency || 'RUB'} onChange={event => update('currency', event.target.value)}>{['RUB', 'USD', 'EUR', 'UAH', 'BYN', 'KZT', 'MDL', 'AZN', 'GEL', 'AMD', 'ILS', 'GBP', 'TMT', 'BYR', 'KZS'].map(code => <option key={code} value={code}>{code}</option>)}</select></label>
       <label>Целевая сумма{hint(true, 'целое число от 1 до 99 999 999')}<input type="number" min={1} max={99999999} step={1} value={value.goal ?? ''} onChange={event => update('goal', event.target.value)} /></label>
       <div className="widget-inline-fields">
-        <label>Собранная сумма{hint(false, 'по умолчанию 0')}<input type="number" min={0} max={99999999} step={1} value={value.funded ?? ''} onChange={event => update('funded', event.target.value)} /></label>
+        <label>Собранная сумма{hint(false, managedBalance ? 'ведётся сервером; для ручного старта используйте новый период учёта' : 'по умолчанию 0')}<input type="number" min={0} max={99999999} step={1} readOnly={Boolean(managedBalance && draft.dataSource?.provider === 'donationalerts')} value={value.funded ?? ''} onChange={event => update('funded', event.target.value)} /></label>
         <label>Число участников{hint(false, 'по умолчанию 0')}<input type="number" min={0} max={99999999} step={1} value={value.backers ?? ''} onChange={event => update('backers', event.target.value)} /></label>
       </div>
       <div className="widget-inline-fields">{[['start', 'Начало сбора'], ['end', 'Окончание сбора']].map(([field, label]) => <label key={field}>{label}{hint(Boolean(value[field === 'start' ? 'end' : 'start']), 'обе даты или ни одной; ваше местное время')}<input type="datetime-local" value={dateValue(value[field])} onChange={event => update(field, event.target.value ? String(Math.floor(new Date(event.target.value).getTime() / 1000)) : '')} /></label>)}</div>
