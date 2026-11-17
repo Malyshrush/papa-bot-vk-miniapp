@@ -4,7 +4,7 @@ import WidgetWorkspace from './WidgetWorkspace.jsx';
 import WidgetDonation from './WidgetDonation.jsx';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
-import { addMiniAppToCommunity, allowMessagesFromGroup, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
+import { addMiniAppToCommunity, allowMessagesFromGroup, buildCommunityPluginUrl, COMMUNITY_PLUGIN, COMMUNITY_PLUGIN_ID, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
 const PAPA_BOT_SERVICE_URL = import.meta.env.VITE_PAPA_BOT_SERVICE_URL || 'https://functions.yandexcloud.net/d4eg37ikm3vl5tm1mjld';
@@ -247,12 +247,12 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-function ServiceIntro({ installBusy, installNotice, cabinetBusy, onAddToCommunity, onOpenService }) {
+function ServiceIntro({ installBusy, installNotice, installedCommunity, cabinetBusy, onAddToCommunity, onOpenService }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
         <div className="intro-heading">
-          <span className="intro-badge">VK Mini App</span>
+          <span className="intro-badge">{COMMUNITY_PLUGIN ? 'Плагин для сообществ ВКонтакте' : 'VK Mini App'}</span>
         </div>
         <h1 id="service-title">{COPY.appTitle}</h1>
         <p>{COPY.appLead}</p>
@@ -265,10 +265,31 @@ function ServiceIntro({ installBusy, installNotice, cabinetBusy, onAddToCommunit
           </div>
           <span>Администратор сможет выбрать своё сообщество VK и добавить в него приложение.</span>
           {installNotice ? <strong role="status">{installNotice}</strong> : null}
+          {COMMUNITY_PLUGIN && installedCommunity ? <a href={buildCommunityPluginUrl(installedCommunity)} target="_blank" rel="noopener noreferrer">Открыть плагин в сообществе</a> : null}
         </div>
       </div>
     </section>
   );
+}
+
+function PluginSetup({ onOpenCabinet, onReload, cabinetBusy, notice }) {
+  return <main className="app-shell">
+    <section className="admin-workspace" aria-labelledby="plugin-setup-title">
+      <h1 id="plugin-setup-title">Настройте PAPA BOT для сообщества</h1>
+      <ol>
+        <li>Откройте кабинет PAPA BOT. Войдите или создайте профиль.</li>
+        <li>В разделе «Настройка» добавьте это сообщество ВКонтакте. Сохраните настройки и ключ сообщества, затем подключите Callback API по инструкции в кабинете.</li>
+        <li>Вернитесь в плагин, нажмите «Проверить подключение» и добавьте первое направление подписки.</li>
+        <li>Откройте «Посмотреть как подписчик», чтобы проверить страницу перед тем, как делиться ссылкой.</li>
+      </ol>
+      <div className="service-entry-actions">
+        <button className="primary-button" type="button" disabled={cabinetBusy} onClick={onOpenCabinet}>Открыть кабинет PAPA BOT</button>
+        <button className="secondary-button" type="button" onClick={onReload}>Проверить подключение</button>
+      </div>
+      {notice ? <p role="alert">{notice}</p> : null}
+    </section>
+    <LegalFooter />
+  </main>;
 }
 
 function VkHandoffConnect({ purpose, busy, error, notice, onConnect }) {
@@ -307,13 +328,14 @@ function EmptyGroups({ onShowOnboarding }) {
 }
 
 function LegalFooter() {
+  const legal = COMMUNITY_PLUGIN ? '/legal/' : './legal/';
   return (
     <footer className="legal-footer">
-      <a href="./legal/terms.html" target="_blank" rel="noreferrer">Соглашение</a>
+      <a href={legal + 'terms.html'} target="_blank" rel="noreferrer">Соглашение</a>
       <span>·</span>
-      <a href="./legal/privacy.html" target="_blank" rel="noreferrer">Конфиденциальность</a>
+      <a href={legal + 'privacy.html'} target="_blank" rel="noreferrer">Конфиденциальность</a>
       <span>·</span>
-      <a href="./legal/consent.html" target="_blank" rel="noreferrer">Согласие на ОПД</a>
+      <a href={legal + 'consent.html'} target="_blank" rel="noreferrer">Согласие на ОПД</a>
     </footer>
   );
 }
@@ -369,7 +391,7 @@ function GroupDetail({ group, busy, busyDots, onBack, onToggle, redirectLink, fe
         <h1>{group.title}</h1>
         {group.description ? <p>{group.description}</p> : null}
       </div>
-      <button className="primary-button subscription-button" type="button" style={buttonStyle} disabled={busy} aria-busy={busy} onClick={onToggle}>
+      <button className="primary-button subscription-button" type="button" style={buttonStyle} disabled={busy || !onToggle} aria-busy={busy} onClick={onToggle}>
         {busy ? `В процессе${'.'.repeat(busyDots)}` : buttonText}
       </button>
       {redirectLink ? (
@@ -426,22 +448,23 @@ function AppMenu({ title, canManage, canManageWidgets, onHome, onSubscriptions, 
   </div>;
 }
 
-function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay }) {
+function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const submit = async (event) => {
     event.preventDefault();
     if (!title.trim()) return;
-    await onCreate({ title, description });
+    if (await onCreate({ title, description }) === false) return;
     setTitle('');
     setDescription('');
   };
   return (
     <section className="admin-workspace" aria-labelledby="admin-workspace-title">
-      <button className="back-button" type="button" onClick={onBack}>{COPY.back}</button>
+      <button className="back-button" type="button" onClick={onBack}>{pluginCommunityId ? 'Посмотреть как подписчик' : COPY.back}</button>
       <p className="admin-workspace-kicker">PAPA BOT · Администратору</p>
       <h1 id="admin-workspace-title">Направления подписок</h1>
       <p>Добавьте направление — оно сразу появится у пользователей этого сообщества.</p>
+      {pluginCommunityId && !groups.some(group => group.enabled && !group.hidden) ? <p>Введите название и описание первого направления, сохраните его и проверьте страницу в режиме подписчика. Пока нет видимого направления, подписчики увидят сообщение о настройке.</p> : null}
       <DisplaySettings groups={groups} value={display} busy={busy} onSave={onSaveDisplay} />
       <form className="admin-group-form" onSubmit={submit}>
         <label>Название<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength="80" placeholder="Например, Новости" required /></label>
@@ -449,7 +472,10 @@ function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay
         <button className="primary-button" type="submit" disabled={busy}>{busy ? COPY.saving : 'Добавить направление'}</button>
       </form>
       <h2>Опубликовано</h2>
-      {groups.length ? <ul className="admin-group-list">{groups.map((group) => <li key={group.slug}><strong>{group.title}</strong><span>{group.description || 'Без описания'}</span></li>)}</ul> : <p className="admin-workspace-empty">Пока нет ни одного направления.</p>}
+      {groups.length ? <ul className="admin-group-list">{groups.map((group) => <li key={group.slug}>
+        <strong>{group.title}</strong><span>{group.description || 'Без описания'}</span>
+        {pluginCommunityId && group.enabled && !group.hidden ? <a href={buildCommunityPluginUrl(pluginCommunityId, group.slug)} target="_blank" rel="noopener noreferrer">Ссылка для подписчиков</a> : null}
+      </li>)}</ul> : <p className="admin-workspace-empty">Пока нет ни одного направления.</p>}
     </section>
   );
 }
@@ -468,32 +494,50 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [busyDots, setBusyDots] = useState(1);
   const redirectGeneration = useRef(0);
+  const routeGeneration = useRef(0);
   const [installBusy, setInstallBusy] = useState(false);
   const [cabinetBusy, setCabinetBusy] = useState(false);
   const [installNotice, setInstallNotice] = useState('');
+  const [installedCommunity, setInstalledCommunity] = useState('');
   const [connectNotice, setConnectNotice] = useState('');
   const [redirectLink, setRedirectLink] = useState(null);
-  const [showOnboarding, setShowOnboarding] = useState(() => !initialRoute.handoff && !initialRoute.donate && !hasCompletedOnboarding());
-  const canManageCommunity = ['admin', 'editor'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
-  const canManageWidgets = ['admin', 'editor', 'creator', 'owner'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase()) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
+  const [showOnboarding, setShowOnboarding] = useState(() => !COMMUNITY_PLUGIN && !initialRoute.handoff && !initialRoute.donate && !hasCompletedOnboarding());
+  const launchRole = String(launchParams.vk_viewer_group_role || '').toLowerCase();
+  const canManageCommunity = !state.preview && ['admin', 'editor'].includes(launchRole) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
+  const canManageWidgets = !state.preview && ['admin', 'editor', 'creator', 'owner'].includes(launchRole) && String(launchParams.vk_group_id || '') === String(state.communityId || '');
   const needsCabinet = (state.errorCode === 'community_not_connected' && state.admin)
     || (state.errorCode === 'community_not_found' && canManageCommunity);
 
   const loadCurrentRoute = useCallback(async (preserveRedirect = false) => {
+    const generation = ++routeGeneration.current;
     if (!preserveRedirect) {
       redirectGeneration.current += 1;
       setRedirectLink(null);
     }
     const route = parseRouteHash();
+    if (COMMUNITY_PLUGIN && !launchParams.vk_group_id) {
+      setState({ ...EMPTY_STATE, loading: false, intro: true });
+      return;
+    }
+    if (COMMUNITY_PLUGIN && (launchParams.vk_app_id !== COMMUNITY_PLUGIN_ID || !launchParams.sign
+      || !launchParams.vk_user_id || !/^[1-9]\d{0,19}$/.test(launchParams.vk_group_id))) {
+      setState({ ...EMPTY_STATE, loading: false, error: 'Откройте PAPA BOT из меню сообщества ВКонтакте.' });
+      return;
+    }
+    const preview = COMMUNITY_PLUGIN && route.viewer && ['admin', 'editor'].includes(launchRole);
+    const widgets = route.widgets && (!COMMUNITY_PLUGIN || (!preview && ['admin', 'editor', 'creator', 'owner'].includes(launchRole)));
+    const admin = COMMUNITY_PLUGIN
+      ? ['admin', 'editor'].includes(launchRole) && !preview && !widgets && !route.donate
+      : route.admin;
     const handoffCommunityId = route.communityId || launchParams.vk_group_id || '';
-    const communityId = route.communityId || launchParams.vk_group_id || DEFAULT_COMMUNITY_ID;
+    const communityId = COMMUNITY_PLUGIN ? launchParams.vk_group_id : route.communityId || launchParams.vk_group_id || DEFAULT_COMMUNITY_ID;
     const intro = !route.communityId && !launchParams.vk_group_id;
     if (!communityId) {
       setState({ ...EMPTY_STATE, loading: false, error: COPY.openByCommunity });
       return;
     }
 
-    if (route.handoff && route.handoffTicket) {
+    if (!COMMUNITY_PLUGIN && route.handoff && route.handoffTicket) {
       setShowOnboarding(false);
       setState({ ...EMPTY_STATE, loading: false, communityId: handoffCommunityId, intro: false, connectUserToken: route.connectUserToken, handoff: route.handoff, handoffTicket: route.handoffTicket, error: !launchParams.sign || !launchParams.vk_user_id ? 'Откройте вход кнопкой «Войти через VK» в кабинете PAPA BOT: для проверки аккаунта нужен запуск внутри VK.' : '' });
       return;
@@ -505,34 +549,43 @@ export default function App() {
       return;
     }
 
-    setState((prev) => ({ ...prev, loading: true, error: '', errorCode: '', communityId, slug: route.slug, intro, admin: route.admin, widgets: route.widgets, connectUserToken: false, handoff: '', handoffTicket: '' }));
+    setState((prev) => ({
+      ...(COMMUNITY_PLUGIN ? EMPTY_STATE : prev), loading: true, error: '', errorCode: '',
+      communityId, slug: route.slug, intro, admin, widgets, preview,
+      connectUserToken: false, handoff: '', handoffTicket: ''
+    }));
     try {
-      if (route.admin) {
+      if (admin) {
         const data = await loadAdminGroups(communityId, launchParams);
+        if (generation !== routeGeneration.current) return;
         setAdminGroups(data.groups || []);
         setAdminDisplay(data.display || { mode: 'list-icons', featuredSlug: '' });
         setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, admin: true });
-      } else if (route.widgets) {
+      } else if (widgets) {
         if (!['admin', 'editor', 'creator', 'owner'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase())
           || String(launchParams.vk_group_id || '') !== String(communityId)) {
           throw new Error('Виджетами может управлять только владелец, администратор или редактор выбранного сообщества VK.');
         }
         const data = await loadAdminGroups(communityId, launchParams);
+        if (generation !== routeGeneration.current) return;
         setAdminGroups(data.groups || []);
         setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, widgets: true });
       } else if (route.slug) {
         const data = await loadGroup(communityId, route.slug, launchParams);
+        if (generation !== routeGeneration.current) return;
         const rememberedSubscribed = readRememberedSubscription(launchParams.vk_user_id, communityId, route.slug);
         const group = data.group && rememberedSubscribed ? { ...data.group, subscribed: true } : data.group;
-        setState({ loading: false, error: '', communityId, slug: route.slug, groups: [], group, intro: false });
+        setState({ ...EMPTY_STATE, loading: false, communityId, slug: route.slug, group, preview });
       } else {
         const data = await loadGroups(communityId, launchParams);
-        setState({ loading: false, error: '', communityId, slug: '', groups: data.groups || [], group: null, featuredGroup: data.featuredGroup || null, display: data.display || { mode: 'list-icons', featuredSlug: '' }, intro });
+        if (generation !== routeGeneration.current) return;
+        setState({ ...EMPTY_STATE, loading: false, communityId, groups: data.groups || [], featuredGroup: data.featuredGroup || null, display: data.display || EMPTY_STATE.display, intro, preview });
       }
     } catch (error) {
+      if (generation !== routeGeneration.current) return;
       setState((prev) => ({ ...prev, loading: false, error: error.message || COPY.loadFailed, errorCode: error.code || '', intro }));
     }
-  }, [launchParams]);
+  }, [launchParams, launchRole]);
 
   useEffect(() => {
     loadCurrentRoute();
@@ -556,13 +609,13 @@ export default function App() {
         // Reloading an editor unmounts its form and discards unsaved input and
         // scroll position. Public subscription pages still refresh on return.
         const route = parseRouteHash();
-        if (route.widgets || route.admin) return;
+        if (route.widgets || route.admin || (COMMUNITY_PLUGIN && ['admin', 'editor'].includes(launchRole) && !route.viewer && !route.donate)) return;
         loadCurrentRoute(true);
       }
     };
     document.addEventListener('visibilitychange', refreshAfterExternalNavigation);
     return () => document.removeEventListener('visibilitychange', refreshAfterExternalNavigation);
-  }, [loadCurrentRoute]);
+  }, [loadCurrentRoute, launchRole]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -582,8 +635,21 @@ export default function App() {
     return () => window.clearTimeout(noticeTimeoutId);
   }, [state.error, state.handoff, needsCabinet]);
 
-  const openGroup = (slug) => setGroupHash(state.communityId, slug);
-  const backToList = () => setGroupHash(state.communityId);
+  const openGroup = (slug) => {
+    if (state.preview) {
+      window.location.hash = new URLSearchParams({ viewer: '1', g: slug }).toString();
+    } else {
+      setGroupHash(state.communityId, slug);
+    }
+  };
+  const backToList = () => {
+    if (state.preview) window.location.hash = 'viewer=1';
+    else setGroupHash(state.communityId);
+  };
+  const previewAsSubscriber = () => {
+    setSection('home');
+    window.location.hash = 'viewer=1';
+  };
   const openHome = () => { setSection('home'); backToList(); };
   const openSubscriptions = () => { setSection('subscriptions'); backToList(); };
   const openAdmin = () => { window.location.hash = new URLSearchParams({ c: state.communityId, admin: '1' }).toString(); };
@@ -594,6 +660,7 @@ export default function App() {
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
   const openService = async () => {
+    if (COMMUNITY_PLUGIN) return openCabinetRegistration();
     setCabinetBusy(true);
     setInstallNotice('');
     try {
@@ -671,9 +738,14 @@ export default function App() {
   const addToCommunity = async () => {
     setInstallBusy(true);
     setInstallNotice('');
+    setInstalledCommunity('');
     try {
       const result = await addMiniAppToCommunity();
       const groupId = String(result?.group_id || '').trim();
+      if (COMMUNITY_PLUGIN && !/^[1-9]\d{0,19}$/.test(groupId)) {
+        throw new Error('ВКонтакте не подтвердил, в какое сообщество добавлен плагин. Проверьте меню сообщества или повторите установку.');
+      }
+      if (/^[1-9]\d{0,19}$/.test(groupId)) setInstalledCommunity(groupId);
       setInstallNotice(groupId
         ? `Приложение добавлено в сообщество ${groupId}. Откройте приложение из меню сообщества.`
         : 'Приложение добавлено. Откройте приложение из меню сообщества.');
@@ -701,7 +773,7 @@ export default function App() {
 
   const toggleSubscription = async () => {
     const activeGroup = state.group || state.featuredGroup;
-    if (!activeGroup || !state.communityId) return;
+    if (!activeGroup || !state.communityId || state.preview) return;
     const generation = ++redirectGeneration.current;
     setRedirectLink(null);
     setBusy(true);
@@ -744,13 +816,16 @@ export default function App() {
   };
 
   const addAdminGroup = async (group) => {
-    if (!state.communityId) return;
+    if (!state.communityId) return false;
     setBusy(true);
     try {
       const data = await createAdminGroup(state.communityId, group, launchParams);
       setAdminGroups((current) => [...current, data.group]);
+      setState((prev) => ({ ...prev, error: '', errorCode: '' }));
+      return true;
     } catch (error) {
       setState((prev) => ({ ...prev, error: error.message || COPY.loadFailed, errorCode: error.code || '' }));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -779,6 +854,29 @@ export default function App() {
 
   if (state.handoff && state.handoffTicket) {
     return <VkHandoffConnect purpose={state.handoff} busy={busy} error={state.error} notice={connectNotice} onConnect={completeHandoff} />;
+  }
+
+  if (COMMUNITY_PLUGIN && state.intro) {
+    return <main className="app-shell">
+      <ServiceIntro installBusy={installBusy} installNotice={installNotice} installedCommunity={installedCommunity} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
+      <LegalFooter />
+    </main>;
+  }
+  if (COMMUNITY_PLUGIN && state.admin && state.errorCode === 'community_not_connected') {
+    return <PluginSetup onOpenCabinet={openCabinetRegistration} onReload={() => loadCurrentRoute()} cabinetBusy={cabinetBusy} notice={installNotice} />;
+  }
+  if (COMMUNITY_PLUGIN && !state.admin && !state.widgets && !state.donate
+    && (['community_not_found', 'group_not_found'].includes(state.errorCode)
+      || (!state.error && !state.group && state.groups.length === 0))) {
+    return <main className="app-shell">
+      <section className="notice">
+        <h1>{state.errorCode === 'group_not_found' ? 'Направление недоступно' : 'Приложение настраивается'}</h1>
+        <p>{state.errorCode === 'group_not_found' ? 'Администратор мог скрыть или удалить это направление.' : 'Администратор сообщества ещё готовит страницу подписок. Загляните позже.'}</p>
+        {state.preview ? <button className="secondary-button" type="button" onClick={openAdmin}>Вернуться к настройкам</button> : null}
+        {state.errorCode === 'group_not_found' ? <button className="secondary-button" type="button" onClick={backToList}>К списку подписок</button> : null}
+      </section>
+      <LegalFooter />
+    </main>;
   }
 
   if (state.error && !state.group && state.groups.length === 0) {
@@ -814,17 +912,18 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
-      {state.donate ? <WidgetDonation communityId={state.communityId} widgetId={state.donate} onBack={backToList} /> : state.widgets ? (
+      {state.preview ? <section className="notice"><p>Предпросмотр от лица подписчика</p><button className="secondary-button" type="button" onClick={openAdmin}>Вернуться к настройкам</button></section> : null}
+      {state.donate ? <WidgetDonation communityId={state.communityId} widgetId={state.donate} onBack={backToList} launchParams={COMMUNITY_PLUGIN ? launchParams : undefined} /> : state.widgets ? (
         <WidgetWorkspace communityId={state.communityId} launchParams={launchParams} groups={adminGroups} onBack={backToList} />
       ) : state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={backToList} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
+          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
         </>
       ) : state.group ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <GroupDetail group={state.group} busy={busy} busyDots={busyDots} onBack={backToList} onToggle={toggleSubscription} redirectLink={redirectLink} />
+          <GroupDetail group={state.group} busy={busy} busyDots={busyDots} onBack={backToList} onToggle={state.preview ? undefined : toggleSubscription} redirectLink={redirectLink} />
         </>
       ) : (
         <>
@@ -832,7 +931,7 @@ export default function App() {
           {installNotice ? <div className="inline-error" role="alert">{installNotice}</div> : null}
           {state.error && !state.intro ? <div className="inline-error">{state.error}</div> : null}
           {section === 'home' && state.display?.mode === 'single' && state.featuredGroup ? (
-            <GroupDetail group={state.featuredGroup} featured busy={busy} busyDots={busyDots} onToggle={toggleSubscription} redirectLink={redirectLink} />
+            <GroupDetail group={state.featuredGroup} featured busy={busy} busyDots={busyDots} onToggle={state.preview ? undefined : toggleSubscription} redirectLink={redirectLink} />
           ) : (section === 'subscriptions' ? state.groups.filter(group => group.subscribed) : state.groups).length ? (
             <GroupList groups={section === 'subscriptions' ? state.groups.filter(group => group.subscribed) : state.groups} mode={section === 'subscriptions' ? 'list-icons' : state.display?.mode || 'list-icons'} onOpen={openGroup} />
           ) : (

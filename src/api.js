@@ -201,8 +201,8 @@ export function widgetIntegration(communityId, action, payload, launchParams) {
   }, 60000);
 }
 
-export function loadWidgetDonation(communityId, widgetId) {
-  return requestReadJson(buildUrl({ miniapp: 'widget-donation', c: communityId, widgetId }));
+export function loadWidgetDonation(communityId, widgetId, launchParams) {
+  return requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'widget-donation', c: communityId, widgetId }, launchParams)));
 }
 
 export function completeVkHandoff(ticket, payload, launchParams) {

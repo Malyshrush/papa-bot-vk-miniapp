@@ -4,7 +4,17 @@ const VK_BRIDGE_TIMEOUT_MS = 7000;
 const VK_AUTH_TIMEOUT_MS = 120000;
 const VK_INIT_ATTEMPT_TIMEOUT_MS = 1200;
 const VK_INIT_RETRY_DELAYS_MS = [0, 200, 400, 800];
-export const PAPA_BOT_VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID || 54600849);
+export const COMMUNITY_PLUGIN = import.meta.env.BASE_URL === '/plugin/';
+export const COMMUNITY_PLUGIN_ID = '54903386';
+export const PAPA_BOT_VK_APP_ID = COMMUNITY_PLUGIN
+  ? Number(COMMUNITY_PLUGIN_ID)
+  : Number(import.meta.env.VITE_VK_APP_ID || 54600849);
+
+export function buildCommunityPluginUrl(communityId, slug) {
+  if (!/^[1-9]\d{0,19}$/.test(String(communityId))) return '';
+  const app = `https://vk.ru/app${COMMUNITY_PLUGIN_ID}_-${communityId}`;
+  return slug ? `${app}#${new URLSearchParams({ g: slug })}` : app;
+}
 
 export async function requestWidgetAutomationToken(communityId) {
   const groupId = Number(communityId);
@@ -66,6 +76,7 @@ export function parseRouteHash() {
     communityId: params.get('c') || '',
     slug: params.get('g') || '',
     admin: params.get('admin') === '1',
+    viewer: params.get('viewer') === '1',
     widgets: params.get('widgets') === '1',
     donate: /^[a-f0-9-]{36}$/.test(params.get('donate') || '') ? params.get('donate') : '',
     handoff,

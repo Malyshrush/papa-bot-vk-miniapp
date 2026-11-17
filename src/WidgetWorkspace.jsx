@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmWidget, deleteWidget, loadWidgets, previewWidget, saveWidget } from './api.js';
-import { showCommunityWidgetPreview } from './vk.js';
+import { buildCommunityPluginUrl, COMMUNITY_PLUGIN, showCommunityWidgetPreview } from './vk.js';
 import { resolveWidgetClient, uploadWidgetImage } from './widget-images.js';
 import WidgetImageAdjuster from './WidgetImageAdjuster.jsx';
 import WidgetTypeThumbnail from './WidgetTypeThumbnail.jsx';
@@ -317,7 +317,9 @@ export default function WidgetWorkspace({ communityId, launchParams, groups, onB
           {groups.length ? <label>Или страница подписки{hint(false, 'можно выбрать вместо ручного ввода ссылки')}<select value="" onChange={event => {
             const slug = event.target.value;
             if (slug) {
-              const url = `https://vk.ru/app54600849#${new URLSearchParams({ c: communityId, g: slug })}`;
+              const url = COMMUNITY_PLUGIN
+                ? buildCommunityPluginUrl(communityId, slug)
+                : `https://vk.ru/app54600849#${new URLSearchParams({ c: communityId, g: slug })}`;
               changeRow(index, 'url', url);
               changeRow(index, 'buttonUrl', url);
             }
