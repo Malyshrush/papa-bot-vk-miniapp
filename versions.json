@@ -56,6 +56,14 @@
       "tag": "papa-bot-miniapp-v7",
       "sha": "a70cab98f62e5a1f0943a97d8703b97e594b80c3",
       "description": "Размещение на Selectel с API через vk.papabot.ru и второй копией на GitHub Pages"
+    },
+    {
+      "version": 8,
+      "name": "Версия 8 — PAPA BOT для сообществ ВКонтакте",
+      "createdAt": "2026-11-17T13:02:37.240Z",
+      "tag": "papa-bot-miniapp-v8",
+      "sha": "bc9808e120a27e94cb0e71f2b2a2707d61075685",
+      "description": "Плагин 54903386 с установкой, настройкой сообщества и просмотром страницы от лица подписчика."
     }
   ]
 }
