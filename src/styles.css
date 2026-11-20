@@ -606,6 +606,7 @@ button {
 }
 
 .notice,
+.cabinet-info,
 .inline-error {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -613,6 +614,8 @@ button {
   padding: 18px;
   box-shadow: var(--shadow);
 }
+
+.cabinet-info { color: var(--text-primary); background: var(--surface); border-color: var(--border); }
 
 .notice-with-action {
   display: grid;

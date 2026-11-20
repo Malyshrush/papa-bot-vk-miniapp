@@ -154,6 +154,17 @@ export function connectCommunityPlugin(communityId, launchParams) {
   });
 }
 
+export function loadCommunityTokenStatus(communityId, launchParams) {
+  return requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'community-tokens', c: communityId }, launchParams)));
+}
+
+export function saveCommunityToken(communityId, accessToken, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'community-tokens', c: communityId }), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, accessToken })
+  }, 60000);
+}
+
 export function createAdminGroup(communityId, group, launchParams) {
   return requestJson(buildUrl({ miniapp: 'admin-create-group', c: communityId }), {
     method: 'POST',

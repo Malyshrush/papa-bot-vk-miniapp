@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createLoginAutoStart } from './handoff-login.js';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
 import WidgetDonation from './WidgetDonation.jsx';
+import CommunityTokens from './CommunityTokens.jsx';
 import { flushSync } from 'react-dom';
 import { completeVkHandoff, connectCommunityPlugin, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, buildCommunityPluginUrl, COMMUNITY_PLUGIN, COMMUNITY_PLUGIN_ID, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
@@ -13,6 +14,7 @@ const ONBOARDING_VERSION = '2026-07-28-v1';
 const ONBOARDING_STORAGE_KEY = 'papa-bot-miniapp-onboarding';
 const THEME_STORAGE_PREFIX = 'papa-bot-miniapp-theme';
 const NOTICE_DURATION_MS = 5000;
+const CABINET_INFO_DURATION_MS = 3000;
 
 const EMPTY_STATE = {
   loading: true,
@@ -247,7 +249,11 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-function ServiceIntro({ installBusy, installNotice, installedCommunity, cabinetBusy, onAddToCommunity, onOpenService }) {
+function CabinetInfo({ notice }) {
+  return notice ? <div className="cabinet-info" role="status" aria-live="polite">{notice.message}</div> : null;
+}
+
+function ServiceIntro({ installBusy, installNotice, installedCommunity, cabinetBusy, onAddToCommunity, onOpenService, cabinetInfo }) {
   return (
     <section className="intro" aria-labelledby="service-title">
       <div className="intro-hero">
@@ -265,6 +271,7 @@ function ServiceIntro({ installBusy, installNotice, installedCommunity, cabinetB
           </div>
           <span>Администратор сможет выбрать своё сообщество VK и добавить в него приложение.</span>
           {installNotice ? <strong role="status">{installNotice}</strong> : null}
+          <CabinetInfo notice={cabinetInfo} />
           {COMMUNITY_PLUGIN && installedCommunity ? <a href={buildCommunityPluginUrl(installedCommunity)} target="_blank" rel="noopener noreferrer">Открыть плагин в сообществе</a> : null}
         </div>
       </div>
@@ -272,14 +279,14 @@ function ServiceIntro({ installBusy, installNotice, installedCommunity, cabinetB
   );
 }
 
-function PluginSetup({ onOpenCabinet, onReload, cabinetBusy, notice }) {
+function PluginSetup({ onOpenCabinet, onReload, cabinetBusy, notice, cabinetInfo }) {
   return <main className="app-shell">
     <section className="admin-workspace" aria-labelledby="plugin-setup-title">
       <h1 id="plugin-setup-title">Настройте PAPA BOT для сообщества</h1>
       <ol>
         <li>Откройте кабинет PAPA BOT. Войдите или создайте профиль.</li>
-        <li>В разделе «Настройка» выберите сохранённое сообщество или добавьте новое. Сохранённые настройки, сценарии и платежные данные остаются в вашем профиле. Для нового сообщества сохраните ключ и подключите Callback API по инструкции.</li>
-        <li>Вернитесь в плагин, нажмите «Проверить подключение» и добавьте первое направление подписки.</li>
+        <li>В разделе «Настройка» выберите сохранённое сообщество или добавьте новое с его VK Group ID. Сохранённые настройки, сценарии и платежные данные остаются в вашем профиле.</li>
+        <li>Вернитесь в плагин, нажмите «Проверить подключение». В разделе «Ключи сообщества» подтвердите разрешения VK: ключ сохранится автоматически. Затем запустите автонастройку Callback API в кабинете и добавьте первое направление подписки.</li>
         <li>Откройте «Посмотреть как подписчик», чтобы проверить страницу перед тем, как делиться ссылкой.</li>
       </ol>
       <div className="service-entry-actions">
@@ -287,6 +294,7 @@ function PluginSetup({ onOpenCabinet, onReload, cabinetBusy, notice }) {
         <button className="secondary-button" type="button" onClick={onReload}>Проверить подключение</button>
       </div>
       {notice ? <p role="alert">{notice}</p> : null}
+      <CabinetInfo notice={cabinetInfo} />
     </section>
     <LegalFooter />
   </main>;
@@ -448,7 +456,7 @@ function AppMenu({ title, canManage, canManageWidgets, onHome, onSubscriptions, 
   </div>;
 }
 
-function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId, connection, onConnect }) {
+function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId, connection, onConnect, launchParams }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const submit = async (event) => {
@@ -470,6 +478,7 @@ function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay
           <button className="primary-button" type="button" disabled={busy} onClick={onConnect}>{busy ? 'Подключаем…' : 'Подключить плагин с сохранением данных'}</button>
         </>}
       </section> : null}
+      {pluginCommunityId ? <CommunityTokens communityId={pluginCommunityId} launchParams={launchParams} /> : null}
       <p>Добавьте направление — оно сразу появится у пользователей этого сообщества.</p>
       {pluginCommunityId && !groups.some(group => group.enabled && !group.hidden) ? <p>Введите название и описание первого направления, сохраните его и проверьте страницу в режиме подписчика. Пока нет видимого направления, подписчики увидят сообщение о настройке.</p> : null}
       <DisplaySettings groups={groups} value={display} busy={busy} onSave={onSaveDisplay} />
@@ -505,6 +514,8 @@ export default function App() {
   const [installBusy, setInstallBusy] = useState(false);
   const [cabinetBusy, setCabinetBusy] = useState(false);
   const [installNotice, setInstallNotice] = useState('');
+  const [cabinetInfo, setCabinetInfo] = useState(null);
+  const cabinetAttempt = useRef(0);
   const [installedCommunity, setInstalledCommunity] = useState('');
   const [connectNotice, setConnectNotice] = useState('');
   const [redirectLink, setRedirectLink] = useState(null);
@@ -640,6 +651,12 @@ export default function App() {
   }, [theme, themeStorageKey]);
 
   useEffect(() => {
+    if (!cabinetInfo) return undefined;
+    const timer = window.setTimeout(() => setCabinetInfo(current => current === cabinetInfo ? null : current), CABINET_INFO_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [cabinetInfo]);
+
+  useEffect(() => {
     if (!state.error || state.handoff || needsCabinet) return undefined;
     if (!state.group && state.groups.length === 0) return undefined;
     const currentNotice = state.error;
@@ -676,17 +693,25 @@ export default function App() {
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
   const openService = async () => {
+    const attempt = ++cabinetAttempt.current;
     setCabinetBusy(true);
     setInstallNotice('');
+    setCabinetInfo(null);
     try {
       if (!launchParams.sign || !launchParams.vk_user_id) {
         await openExternalServiceLink(PAPA_BOT_SERVICE_URL);
         return;
       }
       const handoff = await createCabinetLogin(launchParams);
+      if (attempt !== cabinetAttempt.current) return;
       if (!handoff.ticket) throw new Error('Сервер не создал запрос входа.');
       await openExternalServiceLink(`${PAPA_BOT_SERVICE_URL}?vkMiniAppCabinet=${encodeURIComponent(handoff.ticket)}`);
     } catch (error) {
+      if (attempt !== cabinetAttempt.current) return;
+      if (error?.code === 'cabinet_already_open') {
+        setCabinetInfo({ message: 'Кабинет PAPA BOT уже открыт в браузере. При необходимости вернитесь в его вкладку.', attempt });
+        return;
+      }
       if (error?.code === 'vk_profile_not_linked') {
         setInstallNotice('Сначала войдите в кабинет обычным способом. После входа сразу откроется раздел ПРОФИЛЬ для привязки VK.');
         await openExternalServiceLink(`${PAPA_BOT_SERVICE_URL}?linkVkAfterLogin=1`);
@@ -694,7 +719,7 @@ export default function App() {
       }
       setInstallNotice(error?.message || 'Не удалось открыть кабинет PAPA BOT.');
     } finally {
-      setCabinetBusy(false);
+      if (attempt === cabinetAttempt.current) setCabinetBusy(false);
     }
   };
 
@@ -888,12 +913,12 @@ export default function App() {
 
   if (COMMUNITY_PLUGIN && state.intro) {
     return <main className="app-shell">
-      <ServiceIntro installBusy={installBusy} installNotice={installNotice} installedCommunity={installedCommunity} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} />
+      <ServiceIntro installBusy={installBusy} installNotice={installNotice} installedCommunity={installedCommunity} cabinetBusy={cabinetBusy} onAddToCommunity={addToCommunity} onOpenService={openService} cabinetInfo={cabinetInfo} />
       <LegalFooter />
     </main>;
   }
   if (COMMUNITY_PLUGIN && state.admin && state.errorCode === 'community_not_connected') {
-    return <PluginSetup onOpenCabinet={openService} onReload={() => loadCurrentRoute()} cabinetBusy={cabinetBusy} notice={installNotice} />;
+    return <PluginSetup onOpenCabinet={openService} onReload={() => loadCurrentRoute()} cabinetBusy={cabinetBusy} notice={installNotice} cabinetInfo={cabinetInfo} />;
   }
   if (COMMUNITY_PLUGIN && !state.admin && !state.widgets && !state.donate
     && (['community_not_found', 'group_not_found'].includes(state.errorCode)
@@ -942,13 +967,14 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
+      <CabinetInfo notice={cabinetInfo} />
       {state.preview ? <section className="notice"><p>Предпросмотр от лица подписчика</p><button className="secondary-button" type="button" onClick={openAdmin}>Вернуться к настройкам</button></section> : null}
       {state.donate ? <WidgetDonation communityId={state.communityId} widgetId={state.donate} onBack={backToList} launchParams={COMMUNITY_PLUGIN ? launchParams : undefined} /> : state.widgets ? (
         <WidgetWorkspace communityId={state.communityId} launchParams={launchParams} groups={adminGroups} onBack={backToList} />
       ) : state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} connection={state.connection} onConnect={connectPlugin} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
+          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} connection={state.connection} onConnect={connectPlugin} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} launchParams={launchParams} />
         </>
       ) : state.group ? (
         <>
