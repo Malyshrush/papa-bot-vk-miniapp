@@ -136,8 +136,22 @@ export function unsubscribeGroup(communityId, slug, launchParams) {
   });
 }
 
-export function loadAdminGroups(communityId, launchParams) {
-  return requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'admin-groups', c: communityId }, launchParams)));
+export async function loadAdminGroups(communityId, launchParams) {
+  const data = await requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'admin-groups', c: communityId }, launchParams)));
+  if (String(launchParams?.vk_app_id) !== '54903386') return data;
+  try {
+    const result = await requestReadJson(buildUrl(appendLaunchParams({ miniapp: 'plugin-connection', c: communityId }, launchParams)));
+    return { ...data, connection: result.connection || { status: 'unknown' } };
+  } catch {
+    return { ...data, connection: { status: 'unknown' } };
+  }
+}
+
+export function connectCommunityPlugin(communityId, launchParams) {
+  return requestJson(buildUrl({ miniapp: 'plugin-connection', c: communityId }), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ launchParams, preserveExistingData: true })
+  });
 }
 
 export function createAdminGroup(communityId, group, launchParams) {

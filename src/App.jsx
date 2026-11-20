@@ -3,7 +3,7 @@ import { createLoginAutoStart } from './handoff-login.js';
 import WidgetWorkspace from './WidgetWorkspace.jsx';
 import WidgetDonation from './WidgetDonation.jsx';
 import { flushSync } from 'react-dom';
-import { completeVkHandoff, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
+import { completeVkHandoff, connectCommunityPlugin, createAdminGroup, createCabinetLogin, failVkHandoff, loadAdminGroups, loadGroup, loadGroups, resolveMiniAppImageUrl, saveAdminDisplay, subscribeGroup, unsubscribeGroup } from './api.js';
 import { addMiniAppToCommunity, allowMessagesFromGroup, buildCommunityPluginUrl, COMMUNITY_PLUGIN, COMMUNITY_PLUGIN_ID, navigateMiniAppRedirect, openExternalServiceLink, parseLaunchParams, parseRouteHash, requestPapaBotUserToken, setGroupHash } from './vk.js';
 
 const DEFAULT_COMMUNITY_ID = import.meta.env.VITE_DEFAULT_COMMUNITY_ID || '229445618';
@@ -278,7 +278,7 @@ function PluginSetup({ onOpenCabinet, onReload, cabinetBusy, notice }) {
       <h1 id="plugin-setup-title">Настройте PAPA BOT для сообщества</h1>
       <ol>
         <li>Откройте кабинет PAPA BOT. Войдите или создайте профиль.</li>
-        <li>В разделе «Настройка» добавьте это сообщество ВКонтакте. Сохраните настройки и ключ сообщества, затем подключите Callback API по инструкции в кабинете.</li>
+        <li>В разделе «Настройка» выберите сохранённое сообщество или добавьте новое. Сохранённые настройки, сценарии и платежные данные остаются в вашем профиле. Для нового сообщества сохраните ключ и подключите Callback API по инструкции.</li>
         <li>Вернитесь в плагин, нажмите «Проверить подключение» и добавьте первое направление подписки.</li>
         <li>Откройте «Посмотреть как подписчик», чтобы проверить страницу перед тем, как делиться ссылкой.</li>
       </ol>
@@ -448,7 +448,7 @@ function AppMenu({ title, canManage, canManageWidgets, onHome, onSubscriptions, 
   </div>;
 }
 
-function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId }) {
+function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId, connection, onConnect }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const submit = async (event) => {
@@ -463,6 +463,13 @@ function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay
       <button className="back-button" type="button" onClick={onBack}>{pluginCommunityId ? 'Посмотреть как подписчик' : COPY.back}</button>
       <p className="admin-workspace-kicker">PAPA BOT · Администратору</p>
       <h1 id="admin-workspace-title">Направления подписок</h1>
+      {pluginCommunityId ? <section className="notice" aria-label="Переход на плагин">
+        {connection?.status === 'confirmed' ? <p role="status">Плагин подключён к сохранённому сообществу PAPA BOT. Все данные остаются в прежнем профиле.</p> : <>
+          <p>{connection?.status === 'unknown' ? 'Статус перехода пока недоступен. Можно безопасно повторить подтверждение.' : 'Это сообщество уже сохранено в PAPA BOT. Подключите его к новому плагину с прежними настройками, сценариями и подписчиками.'}</p>
+          <p>Профиль, баланс и платежная история сохраняются. Повторное подключение не создаёт копии и не сбрасывает данные.</p>
+          <button className="primary-button" type="button" disabled={busy} onClick={onConnect}>{busy ? 'Подключаем…' : 'Подключить плагин с сохранением данных'}</button>
+        </>}
+      </section> : null}
       <p>Добавьте направление — оно сразу появится у пользователей этого сообщества.</p>
       {pluginCommunityId && !groups.some(group => group.enabled && !group.hidden) ? <p>Введите название и описание первого направления, сохраните его и проверьте страницу в режиме подписчика. Пока нет видимого направления, подписчики увидят сообщение о настройке.</p> : null}
       <DisplaySettings groups={groups} value={display} busy={busy} onSave={onSaveDisplay} />
@@ -560,7 +567,7 @@ export default function App() {
         if (generation !== routeGeneration.current) return;
         setAdminGroups(data.groups || []);
         setAdminDisplay(data.display || { mode: 'list-icons', featuredSlug: '' });
-        setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, admin: true });
+        setState({ loading: false, error: '', communityId, slug: '', groups: [], group: null, intro: false, admin: true, adminLoaded: true, connection: data.connection });
       } else if (widgets) {
         if (!['admin', 'editor', 'creator', 'owner'].includes(String(launchParams.vk_viewer_group_role || '').toLowerCase())
           || String(launchParams.vk_group_id || '') !== String(communityId)) {
@@ -844,6 +851,21 @@ export default function App() {
     }
   };
 
+  const connectPlugin = async () => {
+    const generation = routeGeneration.current;
+    const communityId = state.communityId;
+    setBusy(true);
+    try {
+      const data = await connectCommunityPlugin(communityId, launchParams);
+      if (generation !== routeGeneration.current) return;
+      setState(prev => ({ ...prev, connection: data.connection, error: '' }));
+    } catch (error) {
+      if (generation === routeGeneration.current) setState(prev => ({ ...prev, error: error.message || 'Не удалось подключить плагин. Повторите попытку.' }));
+    } finally {
+      if (generation === routeGeneration.current) setBusy(false);
+    }
+  };
+
   if (showOnboarding) {
     return <Onboarding onComplete={completeOnboarding} />;
   }
@@ -879,7 +901,7 @@ export default function App() {
     </main>;
   }
 
-  if (state.error && !state.group && state.groups.length === 0) {
+  if (state.error && !state.group && state.groups.length === 0 && !state.adminLoaded) {
     if (needsCabinet) {
       return <StatusView title="Подключите сообщество" text={state.error} onOpenCabinet={openCabinetRegistration} cabinetBusy={cabinetBusy} cabinetNotice={installNotice} />;
     }
@@ -918,7 +940,7 @@ export default function App() {
       ) : state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
+          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} connection={state.connection} onConnect={connectPlugin} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} />
         </>
       ) : state.group ? (
         <>

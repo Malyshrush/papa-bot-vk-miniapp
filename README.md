@@ -2,6 +2,8 @@
 
 Frontend for the PAPA BOT VK Mini App.
 
+Community plugin `54903386` is built at `/plugin/`. Existing PAPA BOT communities can confirm their transition through the cabinet's community link and the plugin's «Подключить плагин с сохранением данных» action. The backend resolves the original profile and community scope from a signed VK administrator launch and stores only a separate confirmation record. Profiles, balance, payment history, settings, scenarios and subscribers retain their original storage. Confirmation does not claim that the plugin remains installed in VK; installation and removal are managed by VK. New communities first follow the cabinet connection instructions.
+
 ## Local development
 
 ```bash
