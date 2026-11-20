@@ -53,6 +53,7 @@ jobs:
           VITE_PAPA_BOT_API_URL: ${{ vars.PAPA_BOT_PUBLIC_URL }}
           VITE_DEFAULT_COMMUNITY_ID: ${{ vars.DEFAULT_COMMUNITY_ID }}
           VITE_BASE_PATH: /papa-bot-vk-miniapp/
+          VITE_COMMUNITY_PLUGIN: '1'
 
       - name: Record source revision
         run: node -e "require('fs').writeFileSync('dist/release.json', JSON.stringify({sha:require('child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()}))"

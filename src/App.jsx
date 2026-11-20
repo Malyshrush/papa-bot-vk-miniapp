@@ -523,6 +523,14 @@ export default function App() {
       setRedirectLink(null);
     }
     const route = parseRouteHash();
+    // Cabinet login is a signed personal launch: it does not require an installed community.
+    if (COMMUNITY_PLUGIN && route.handoff === 'login' && route.handoffTicket) {
+      setShowOnboarding(false);
+      const validLaunch = launchParams.vk_app_id === COMMUNITY_PLUGIN_ID && launchParams.sign && launchParams.vk_user_id;
+      setState({ ...EMPTY_STATE, loading: false, handoff: 'login', handoffTicket: route.handoffTicket,
+        error: validLaunch ? '' : 'Начните вход кнопкой «Войти через VK» в кабинете PAPA BOT.' });
+      return;
+    }
     if (COMMUNITY_PLUGIN && !launchParams.vk_group_id) {
       setState({ ...EMPTY_STATE, loading: false, intro: true });
       return;
@@ -668,7 +676,6 @@ export default function App() {
   };
   const toggleTheme = () => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
   const openService = async () => {
-    if (COMMUNITY_PLUGIN) return openCabinetRegistration();
     setCabinetBusy(true);
     setInstallNotice('');
     try {
@@ -886,7 +893,7 @@ export default function App() {
     </main>;
   }
   if (COMMUNITY_PLUGIN && state.admin && state.errorCode === 'community_not_connected') {
-    return <PluginSetup onOpenCabinet={openCabinetRegistration} onReload={() => loadCurrentRoute()} cabinetBusy={cabinetBusy} notice={installNotice} />;
+    return <PluginSetup onOpenCabinet={openService} onReload={() => loadCurrentRoute()} cabinetBusy={cabinetBusy} notice={installNotice} />;
   }
   if (COMMUNITY_PLUGIN && !state.admin && !state.widgets && !state.donate
     && (['community_not_found', 'group_not_found'].includes(state.errorCode)
@@ -930,7 +937,7 @@ export default function App() {
         onSubscriptions={openSubscriptions}
         onSettings={openAdmin}
         onWidgets={openWidgets}
-        onCabinet={openCabinetRegistration}
+        onCabinet={openService}
         onShowOnboarding={() => setShowOnboarding(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
