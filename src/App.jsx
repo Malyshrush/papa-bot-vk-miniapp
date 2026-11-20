@@ -456,7 +456,7 @@ function AppMenu({ title, canManage, canManageWidgets, onHome, onSubscriptions, 
   </div>;
 }
 
-function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId, connection, onConnect, launchParams }) {
+function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay, pluginCommunityId, connection, onConnect, launchParams, onOpenCabinet }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const submit = async (event) => {
@@ -478,7 +478,7 @@ function AdminWorkspace({ groups, display, busy, onBack, onCreate, onSaveDisplay
           <button className="primary-button" type="button" disabled={busy} onClick={onConnect}>{busy ? 'Подключаем…' : 'Подключить плагин с сохранением данных'}</button>
         </>}
       </section> : null}
-      {pluginCommunityId ? <CommunityTokens communityId={pluginCommunityId} launchParams={launchParams} /> : null}
+      {pluginCommunityId ? <CommunityTokens communityId={pluginCommunityId} launchParams={launchParams} onOpenCabinet={onOpenCabinet} /> : null}
       <p>Добавьте направление — оно сразу появится у пользователей этого сообщества.</p>
       {pluginCommunityId && !groups.some(group => group.enabled && !group.hidden) ? <p>Введите название и описание первого направления, сохраните его и проверьте страницу в режиме подписчика. Пока нет видимого направления, подписчики увидят сообщение о настройке.</p> : null}
       <DisplaySettings groups={groups} value={display} busy={busy} onSave={onSaveDisplay} />
@@ -974,7 +974,7 @@ export default function App() {
       ) : state.admin ? (
         <>
           {state.error ? <div className="inline-error">{state.error}</div> : null}
-          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} connection={state.connection} onConnect={connectPlugin} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} launchParams={launchParams} />
+          <AdminWorkspace groups={adminGroups} display={adminDisplay} busy={busy} onBack={COMMUNITY_PLUGIN ? previewAsSubscriber : backToList} pluginCommunityId={COMMUNITY_PLUGIN ? state.communityId : ''} connection={state.connection} onConnect={connectPlugin} onCreate={addAdminGroup} onSaveDisplay={updateAdminDisplay} launchParams={launchParams} onOpenCabinet={openService} />
         </>
       ) : state.group ? (
         <>
