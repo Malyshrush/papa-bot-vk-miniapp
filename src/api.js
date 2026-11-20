@@ -35,7 +35,7 @@ export function resolveMiniAppImageUrl(value) {
 function buildUrl(params = {}) {
   const url = new URL(resolveApiBase());
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && (value !== '' || key.startsWith('vk_'))) {
       url.searchParams.set(key, value);
     }
   });
