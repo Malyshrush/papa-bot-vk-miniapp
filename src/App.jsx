@@ -517,6 +517,7 @@ export default function App() {
 
   const loadCurrentRoute = useCallback(async (preserveRedirect = false) => {
     const generation = ++routeGeneration.current;
+    setBusy(false);
     if (!preserveRedirect) {
       redirectGeneration.current += 1;
       setRedirectLink(null);
