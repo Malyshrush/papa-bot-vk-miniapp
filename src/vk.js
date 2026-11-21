@@ -28,23 +28,6 @@ export async function requestWidgetAutomationToken(communityId) {
   return token;
 }
 
-export async function requestCommunityToken(communityId) {
-  const groupId = Number(communityId);
-  if (!Number.isSafeInteger(groupId) || groupId <= 0 || !COMMUNITY_PLUGIN) throw new Error('Откройте плагин в выбранном сообществе VK.');
-  // One explicit VK consent per click. VK may return a previously granted key.
-  const method = bridge.supports('VKWebAppGetCommunityToken') ? 'VKWebAppGetCommunityToken' : 'VKWebAppGetCommunityAuthToken';
-  let result;
-  try {
-    result = await sendBridgeWithTimeout(method, { app_id: Number(COMMUNITY_PLUGIN_ID), group_id: groupId,
-      scope: 'manage,messages,photos,docs,stories,app_widget' }, 'VK не завершил выдачу ключа. Повторите запрос.', 90000);
-  } catch {
-    throw new Error('VK не выдал ключ. Подтвердите разрешения администратора; если окно не открылось, запустите плагин в другом клиенте VK.');
-  }
-  const token = typeof result?.access_token === 'string' ? result.access_token : '';
-  if (token.length < 8 || token.length > 4096 || /[\s\u0000-\u001f]/.test(token)
-    || (result.group_id !== undefined && String(result.group_id) !== String(groupId))) throw new Error('VK не подтвердил ключ выбранного сообщества. Повторите запрос.');
-  return token;
-}
 export const VK_USER_TOKEN_SCOPES = Object.freeze(['groups', 'photos', 'video', 'docs', 'wall', 'market']);
 
 export async function showCommunityWidgetPreview(communityId, type, code) {
